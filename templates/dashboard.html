@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block content %}
+      <!-- Content -->
+      <section class="flex-1 p-1 overflow-y-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+          <!-- Gráficos -->
+          <div class="bg-white shadow rounded p-4">
+            <canvas id="chartBar"></canvas>
+          </div>
+          <div class="bg-white shadow rounded p-4">
+            <canvas id="chartLine"></canvas>
+          </div>
+          <div class="bg-white shadow rounded p-4">
+            <canvas id="chartPie"></canvas>
+          </div>
+          <div class="bg-white shadow rounded p-4">
+            <canvas id="chartArea"></canvas>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Scripts de Chart.js -->
+  <script>
+    // Configuración para gráfico de barras
+    new Chart(document.getElementById('chartBar'), {
+      type: 'bar',
+      data: {
+        labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo'],
+        datasets: [{
+          label: 'Ingresos',
+          data: [5000, 7000, 8000, 5500, 9000],
+          backgroundColor: '#10B981',
+        }]
+      }
+    });
+
+    // Configuración para gráfico de líneas
+    new Chart(document.getElementById('chartLine'), {
+      type: 'line',
+      data: {
+        labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo'],
+        datasets: [{
+          label: 'Egresos',
+          data: [4000, 6000, 7500, 4500, 8500],
+          borderColor: '#4B5563',
+          fill: false,
+        }]
+      }
+    });
+
+    // Configuración para gráfico de pastel
+    new Chart(document.getElementById('chartPie'), {
+      type: 'pie',
+      data: {
+        labels: ['Marketing', 'Operaciones', 'Logística'],
+        datasets: [{
+          data: [3000, 5000, 2000],
+          backgroundColor: ['#10B981', '#4B5563', '#EF4444']
+        }]
+      }
+    });
+
+    // Configuración para gráfico de área
+    new Chart(document.getElementById('chartArea'), {
+      type: 'line',
+      data: {
+        labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo'],
+        datasets: [{
+          label: 'Balance',
+          data: [1000, 2000, 3000, 4000, 5000],
+          backgroundColor: 'rgba(16, 185, 129, 0.2)',
+          borderColor: '#10B981',
+          fill: true,
+        }]
+      }
+    });
+  </script>
+{% endblock %}

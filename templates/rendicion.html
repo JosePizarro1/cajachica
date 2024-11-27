@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block content %}
+      <main class="flex-1 p-8">
+        <h2 class="text-3xl font-bold mb-6">Caja Rendición</h2>
+      
+        <!-- Formulario -->
+        <div class="bg-white shadow-md rounded-lg p-6">
+          <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      
+            <!-- Código de Requerimiento -->
+            <div>
+              <label for="codigo_requerimiento" class="block text-sm font-medium text-gray-700">Código de Requerimiento:</label>
+              <input type="text" id="codigo_requerimiento" name="codigo_requerimiento" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Ej. REQ001">
+            </div>
+      
+            <!-- Persona (Nombre) -->
+            <div>
+              <label for="persona" class="block text-sm font-medium text-gray-700">Persona (Nombre):</label>
+              <input type="text" id="persona" name="persona" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Nombre de la persona">
+            </div>
+      
+            <!-- Fecha Automática -->
+            <div>
+              <label for="fecha" class="block text-sm font-medium text-gray-700">Fecha:</label>
+              <input type="date" id="fecha" name="fecha" value="{{ today }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" readonly>
+            </div>
+      
+            <!-- Monto -->
+            <div>
+              <label for="monto" class="block text-sm font-medium text-gray-700">Monto:</label>
+              <input type="number" id="monto" name="monto" step="0.01" placeholder="0.00" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300">
+            </div>
+      
+            <!-- Método de Pago -->
+            <div>
+              <label for="metodo_pago" class="block text-sm font-medium text-gray-700">Método de Pago:</label>
+              <select id="metodo_pago" name="metodo_pago" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" onchange="toggleTransferencia()">
+                <option value="efectivo">Efectivo</option>
+                <option value="yape">Yape</option>
+                <option value="transferencia">Transferencia</option>
+              </select>
+            </div>
+      
+            <!-- Número de Transferencia (visible solo si el método de pago es Transferencia) -->
+            <div id="numero_transferencia" style="display: none;">
+              <label for="numero_transferencia_input" class="block text-sm font-medium text-gray-700">Número de Transferencia:</label>
+              <input type="text" id="numero_transferencia_input" name="numero_transferencia_input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Número de transferencia">
+            </div>
+      
+            <!-- Sede -->
+            <div>
+              <label for="sede" class="block text-sm font-medium text-gray-700">Sede:</label>
+              <select id="sede" name="sede" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300">
+                <option value="focus">FOCUS</option>
+                <option value="egatur">EGATUR</option>
+              </select>
+            </div>
+      
+            <!-- Botón de Guardar -->
+            <div class="col-span-1 md:col-span-2 lg:col-span-3 text-right">
+              <button type="submit" class="bg-accent text-white px-4 py-2 rounded shadow hover:bg-green-600 transition duration-300">
+                Guardar
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
+      
+      <!-- Script para mostrar el campo de "Número de Transferencia" si se selecciona "Transferencia" -->
+      <script>
+        function toggleTransferencia() {
+          const metodoPago = document.getElementById('metodo_pago').value;
+          const numeroTransferencia = document.getElementById('numero_transferencia');
+          
+          if (metodoPago === 'transferencia') {
+            numeroTransferencia.style.display = 'block'; // Muestra el campo de número de transferencia
+          } else {
+            numeroTransferencia.style.display = 'none'; // Oculta el campo de número de transferencia
+          }
+        }
+      </script>
+
+{% endblock %}
+ 

@@ -1,0 +1,178 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <!-- CSS de Bootstrap y iconos -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"> <!-- Íconos -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #255A9E, #19497C);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            transition: all 0.3s ease;
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.1); /* Fondo translúcido */
+            backdrop-filter: blur(10px); /* Efecto de desenfoque */
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            max-width: 350px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+
+        .login-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .form-group label {
+            font-weight: 500;
+            font-size: 16px;
+            color: #FFF;
+        }
+
+        .form-control {
+            border-radius: 20px;
+            border: 2px solid #255A9E;
+            padding: 12px;
+            background: transparent;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            border-color: #19497C;
+            background: #f0f8ff;
+            box-shadow: 0 0 10px rgba(25, 73, 124, 0.5);
+        }
+
+        .btn-primary {
+            background-color: #255A9E;
+            border: none;
+            border-radius: 20px;
+            padding: 12px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: #19497C;
+        }
+
+        .forgot-password {
+            text-decoration: none;
+            color: #FFF;
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .forgot-password:hover {
+            color: #f0f8ff;
+        }
+
+        .logo {
+            max-width: 200px;
+            margin-bottom: 20px;
+            animation: logo-zoom 4s ease-in-out infinite;
+        }
+
+        @keyframes logo-zoom {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        #toggle-dark-mode {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #255A9E;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            padding: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+
+        #toggle-dark-mode:hover {
+            background-color: #19497C;
+        }
+
+        /* Modo oscuro */
+        .dark-mode {
+            background-color: #121212;
+        }
+
+        .dark-mode .login-container {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .dark-mode .form-control {
+            border-color: #3a3a3a;
+        }
+
+        .dark-mode .btn-primary {
+            background-color: #0033A0;
+        }
+
+        .dark-mode .forgot-password {
+            color: #0033A0;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container" id="login-container">
+        <div class="text-center">
+            <img src="{% static 'images/logo.png' %}" alt="Logo" class="logo"/>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <input type="text" class="form-control" id="username" name="username" placeholder="Usuario" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input type="password" class="form-control" id="password" name="password" placeholder="Contraseña" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Ingresar</button>
+            <a href="/password_reset/" class="forgot-password">¿Olvidaste tu contraseña?</a>
+        </form>
+    </div>
+
+    <script>
+        // Mostrar login con animación fade-in
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginContainer = document.getElementById('login-container');
+            setTimeout(function() {
+                loginContainer.classList.add('visible');
+            }, 50);
+        });
+
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EGATUR - Caja Chica</title>
+  
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Configuración de Tailwind -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Roboto', 'sans-serif'],
+          },
+          colors: {
+            primary: '#1F2937',
+            secondary: '#4B5563',
+            accent: '#10B981',
+          },
+        },
+      },
+    };
+  </script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-primary text-gray-200 md:block hidden h-full">
+      <div class="p-6">
+        <h1 class="text-2xl font-bold text-accent">EGATUR</h1>
+        <p class="text-sm">Caja Chica</p>
+      </div>
+      <nav class="mt-6">
+        <!-- Dashboard -->
+        <a href="{% url 'dashboard' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M3 9a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
+            <path d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
+            <path d="M3 13a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1z" />
+          </svg>
+          Dashboard
+        </a>
+      
+        <!-- Ingreso -->
+        <a href="{% url 'ingreso' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M4 4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1H4zm3 7a1 1 0 011 1v2h4v-2a1 1 0 112 0v2a2 2 0 01-2 2H7a2 2 0 01-2-2v-2a1 1 0 011-1z" />
+            <path d="M8 9a2 2 0 114 0 2 2 0 01-4 0z" />
+          </svg>
+          Ingreso
+        </a>
+      
+        <!-- Gasto -->
+        <a href="{% url 'gasto' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6 2a1 1 0 000 2h8a1 1 0 110 2H6a1 1 0 000 2h7a1 1 0 010 2H8a1 1 0 100 2h6a1 1 0 010 2H5a1 1 0 110-2h3a1 1 0 100-2H6a1 1 0 110-2h8a1 1 0 110 2H6a1 1 0 010-2H9a1 1 0 110-2H6a1 1 0 010-2z" />
+          </svg>
+          Gasto
+        </a>
+      
+        <!-- Rendición -->
+        <a href="{% url 'rendicion' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm8-5a1 1 0 100 2 1 1 0 000-2zM7 8a1 1 0 100 2h2.5a.5.5 0 01.5.5V12a1 1 0 102 0v-1.5A2.5 2.5 0 009.5 8H7z" clip-rule="evenodd" />
+          </svg>
+          Rendición
+        </a>
+      </nav>
+    </aside>
+    
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-h-screen">
+        <!-- Topbar -->
+        <header class="bg-white shadow p-4 flex justify-between items-center">
+          <div class="flex items-center">
+            <button id="sidebar-toggle" class="text-gray-500 md:hidden">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M2 4a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1zM2 10a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1zM2 16a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1z" clip-rule="evenodd"/>
+              </svg>
+            </button>
+            <h2 class="text-xl font-bold text-primary ml-2">Dashboard</h2>
+          </div>
+          <div>
+            <button class="px-4 py-2 bg-secondary text-white rounded hover:bg-gray-800 flex items-center">
+              Cerrar Sesión
+            </button>
+          </div>
+        </header>
+
+        <!-- Aquí se carga el contenido de las vistas específicas -->
+        <div class="p-6 overflow-y-auto">
+          {% block content %}
+          <!-- El contenido específico de cada vista se cargará aquí -->
+          {% endblock %}
+        </div>
+    </main>
+  </div>
+
+  <!-- Script para el toggle del sidebar -->
+  <script>
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.querySelector('aside');
+
+    sidebarToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('hidden');
+    });
+  </script>
+
+</body>
+</html>
