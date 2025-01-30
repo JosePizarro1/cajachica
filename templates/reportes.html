@@ -1,0 +1,213 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <!-Hubo un error al generar el reporte- SweetAlert -->
+
+<div class="container mx-auto p-6 bg-white shadow rounded">
+    <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">Generar Reportes</h1>
+    <form id="formReporte" method="post" class="space-y-6">
+        {% csrf_token %}
+        <!-- Filtros en formato 2x2 -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Concepto Nivel 1 -->
+            <div class="flex flex-col">
+                <label for="concepto_nivel_1" class="block text-sm font-medium text-gray-700 mb-2">
+                    Concepto Nivel 1:
+                </label>
+                <select id="concepto_nivel_1" name="concepto_nivel_1" class="w-full border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="todos">Todos los Conceptos Nivel 1</option>
+                    {% for concepto in conceptos_nivel_1 %}
+                        <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Concepto Nivel 2 -->
+            <div class="flex flex-col">
+                <label for="concepto_nivel_2" class="block text-sm font-medium text-gray-700 mb-2">
+                    Concepto Nivel 2:
+                </label>
+                <select id="concepto_nivel_2" name="concepto_nivel_2" class="w-full border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="todos">Todos los Conceptos Nivel 2</option>
+                </select>
+            </div>
+
+            <!-- Fecha Inicio -->
+            <div class="flex flex-col">
+                <label for="fecha_inicio" class="block text-sm font-medium text-gray-700 mb-2">
+                    Fecha Inicio:
+                </label>
+                <div class="relative">
+                    <input 
+                        type="date" 
+                        id="fecha_inicio" 
+                        name="fecha_inicio" 
+                        class="w-full border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+            </div>
+
+            <!-- Fecha Final -->
+            <div class="flex flex-col">
+                <label for="fecha_final" class="block text-sm font-medium text-gray-700 mb-2">
+                    Fecha Final:
+                </label>
+                <div class="relative">
+                    <input 
+                        type="date" 
+                        id="fecha_final" 
+                        name="fecha_final" 
+                        class="w-full border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón para generar el reporte -->
+        <div class="flex justify-center mt-4">
+            <button 
+                type="submit" 
+                id="btnGenerarPDF" 
+                class="px-6 py-3 bg-red-600 text-white font-medium rounded-md shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-300">
+                Generar PDF
+            </button>
+        </div>
+    </form>
+</div>
+
+
+<!-- Carga de FontAwesome para íconos (opcional, si no se usa ya) -->
+<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+
+
+<script>
+$(document).ready(function() {
+    $('#concepto_nivel_2').select2();
+    $('#concepto_nivel_1').select2();
+});
+
+
+        $('#concepto_nivel_1').on('change', function() {
+            var conceptoId = $(this).val();
+            $.ajax({
+                url: '{% url "get_nivel_2_conceptos" %}',
+                data: {id_concepto_padre: conceptoId},
+                success: function(data) {
+                    $('#concepto_nivel_2').empty().append('<option value="todos">Todos los Conceptos Nivel 2</option>');
+                    $.each(data, function(index, concepto) {
+                        $('#concepto_nivel_2').append('<option value="' + concepto.id + '">' + concepto.concepto_nombre + '</option>');
+                    });
+                }
+            });
+        });
+$('#formReporte').on('submit', function(event) {
+    event.preventDefault();
+
+    const conceptoNivel1 = $('#concepto_nivel_1').val();
+    const conceptoNivel2 = $('#concepto_nivel_2').val();
+    const fechaInicio = $('#fecha_inicio').val();
+    const fechaFinal = $('#fecha_final').val();
+
+        // Validar que ambas fechas estén llenas
+    if (!fechaInicio || !fechaFinal) {
+        Swal.fire({
+            title: 'Error',
+            text: 'Por favor, complete ambas fechas: inicio y final.',
+            icon: 'warning',
+            confirmButtonText: 'Aceptar'
+        });
+        return;
+    }
+    // Validar que la fecha de inicio no sea posterior a la fecha final
+    if (new Date(fechaInicio) > new Date(fechaFinal)) {
+        Swal.fire({
+            title: 'Error',
+            text: 'La fecha de inicio no puede ser posterior a la fecha final.',
+            icon: 'warning',
+            confirmButtonText: 'Aceptar'
+        });
+        return;
+    }
+    $.ajax({
+        url: '{% url "generar_reporte_json" %}',
+        type: 'GET',
+        data: {
+            fecha_inicio: fechaInicio,
+            fecha_final: fechaFinal,
+            concepto_nivel_1: conceptoNivel1,
+            concepto_nivel_2: conceptoNivel2,
+        },
+        success: function(data) {
+            generarPDF(data);
+        },
+        error: function(xhr) {
+            // Capturamos y mostramos errores con SweetAlert
+            const response = xhr.responseJSON;
+            Swal.fire({
+                title: 'Error',
+                text: response.error || 'Hubo un error al generar el reporte.',
+                icon: 'error',
+                confirmButtonText: 'Aceptar'
+            });
+        }
+    });
+});
+
+function generarPDF(data) {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) {
+        alert("jsPDF no está cargado correctamente.");
+        return;
+    }
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    const conceptoNivel1Texto = $('#concepto_nivel_1 option:selected').text(); // Agregado
+    const title = `Reporte - ${conceptoNivel1Texto}`; // Agregado
+    const titleWidth = doc.getStringUnitWidth(title) * doc.getFontSize() / doc.internal.scaleFactor;
+    const titleX = (doc.internal.pageSize.width - titleWidth) / 2; // Calculamos el X para centrar el título
+    doc.text(title, titleX, 20); // Posicionamos el título en la página (X, Y)
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Fecha: ${data.fecha}`, 20, 30); // Posición Y para la fecha del reporte (20, 30)
+    let yPosition = 40;  // La posición de inicio para la tabla y los títulos del grupo
+    data.gastos_por_grupo.forEach(group => {
+        // Definir las columnas de la tabla
+        const columns = ["Proveedor", "Concepto", "Forma de Pago", "Importe", "Fecha"];
+        const tableData = [];
+        for (let i = 0; i < group.gastos.length; i++) {
+            const gasto = group.gastos[i];
+            const importe = parseFloat(gasto.importe);
+            const importeFormateado = isNaN(importe) ? "0.00" : importe.toFixed(2);
+            tableData.push([
+                gasto.proveedor,
+                gasto.concepto,
+                gasto.forma_pago,
+                importeFormateado,
+                gasto.fecha
+            ]);
+        }
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text(`Concepto Nivel 2: ${group.nivel_2}`, 20, yPosition);
+        yPosition += 10;  // Ajustamos el espacio antes de la tabla
+        doc.autoTable(columns, tableData, {
+            margin: { top: yPosition }, // La tabla comienza en la posición 'yPosition'
+            styles: { fontSize: 10 },
+            startY: yPosition, // Comienza en la posición 'yPosition'
+        });
+        yPosition = doc.lastAutoTable.finalY + 10;  // La posición Y para el siguiente título de grupo
+    });
+    const totalImporte = parseFloat(data.total_importe);
+    const totalImporteFormateado = isNaN(totalImporte) ? "0.00" : totalImporte.toFixed(2);
+    const totalText = `Total Importe: ${totalImporteFormateado}`;
+    doc.text(totalText, 20, yPosition); // Imprime el total en la posición X=20, Y= después de la última tabla
+    doc.save("reporte_gastos.pdf");
+}
+
+</script>
+{% endblock %}

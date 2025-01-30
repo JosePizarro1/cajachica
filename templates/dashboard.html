@@ -12,11 +12,13 @@
             <canvas id="chartLine"></canvas>
           </div>
           <div class="bg-white shadow rounded p-4">
-            <canvas id="chartPie"></canvas>
+            <canvas id="topConceptosChart"></canvas>
           </div>
-          <div class="bg-white shadow rounded p-4">
-            <canvas id="chartArea"></canvas>
-          </div>
+           <div class="bg-white shadow rounded p-4">
+            <canvas id="gastosMetodoPagoChart"></canvas>
+          </div>         
+          
+          
         </div>
       </section>
     </main>
@@ -24,58 +26,93 @@
 
   <!-- Scripts de Chart.js -->
   <script>
-    // Configuración para gráfico de barras
-    new Chart(document.getElementById('chartBar'), {
-      type: 'bar',
-      data: {
-        labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo'],
-        datasets: [{
+  // Configuración para gráfico de barras (Solo mes actual)
+      const ctx = document.getElementById('topConceptosChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'pie', // Cambiar a 'bar' para barras horizontales
+        data: {
+            labels: {{ conceptos_labels | safe }},
+            datasets: [{
+                label: 'Gastos por concepto',
+                data: {{ conceptos_data | safe }},
+                backgroundColor: [
+                    '#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#47d147'
+                ],
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let value = context.raw.toLocaleString('es-PE', { style: 'currency', currency: 'PEN' });
+                            return `${context.label}: ${value}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+  new Chart(document.getElementById('chartBar'), {
+    type: 'bar',
+    data: {
+      labels: {{ labels_bar|safe }},
+      datasets: [{
+        label: 'Ingresos',
+        data: {{ ingresos_por_mes_bar|safe }},
+        backgroundColor: '#10B981',
+      },
+      {
+        label: 'Gastos',
+        data: {{ gastos_por_mes_bar|safe }},
+        backgroundColor: '#EF4444',
+      }]
+    }
+  });
+
+ // Configuración para gráfico de líneas (Todo el año)
+  new Chart(document.getElementById('chartLine'), {
+    type: 'line',
+    data: {
+      labels: {{ labels_line|safe }},
+      datasets: [
+        {
           label: 'Ingresos',
-          data: [5000, 7000, 8000, 5500, 9000],
-          backgroundColor: '#10B981',
-        }]
-      }
-    });
-
-    // Configuración para gráfico de líneas
-    new Chart(document.getElementById('chartLine'), {
-      type: 'line',
-      data: {
-        labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo'],
-        datasets: [{
-          label: 'Egresos',
-          data: [4000, 6000, 7500, 4500, 8500],
-          borderColor: '#4B5563',
-          fill: false,
-        }]
-      }
-    });
-
-    // Configuración para gráfico de pastel
-    new Chart(document.getElementById('chartPie'), {
-      type: 'pie',
-      data: {
-        labels: ['Marketing', 'Operaciones', 'Logística'],
-        datasets: [{
-          data: [3000, 5000, 2000],
-          backgroundColor: ['#10B981', '#4B5563', '#EF4444']
-        }]
-      }
-    });
-
-    // Configuración para gráfico de área
-    new Chart(document.getElementById('chartArea'), {
-      type: 'line',
-      data: {
-        labels: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo'],
-        datasets: [{
-          label: 'Balance',
-          data: [1000, 2000, 3000, 4000, 5000],
-          backgroundColor: 'rgba(16, 185, 129, 0.2)',
+          data: {{ ingresos_por_mes_line|safe }},
           borderColor: '#10B981',
-          fill: true,
-        }]
-      }
+          fill: false,
+        },
+        {
+          label: 'Gastos',
+          data: {{ gastos_por_mes_line|safe }},
+          borderColor: '#EF4444',
+          fill: false,
+        }
+      ]
+    }
+  });
+    const ctx1 = document.getElementById('gastosMetodoPagoChart').getContext('2d');
+    const gastosMetodoPagoChart = new Chart(ctx1, {
+        type: 'doughnut', // Cambiar a 'bar' si quieres barras
+        data: {
+            labels: {{ datos_gastos_metodo_pago.etiquetas|safe }},
+            datasets: [{
+                label: 'Gastos por Método de Pago',
+                data: {{ datos_gastos_metodo_pago.valores|safe }},
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
+                ],
+                hoverBackgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
+                ]
+            }]
+        }
     });
+
   </script>
 {% endblock %}

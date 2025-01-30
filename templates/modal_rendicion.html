@@ -1,0 +1,68 @@
+<!-- modal_rendicion.html -->
+{% for item in movimientos %}
+  {% if item.tipo == "Gasto" %}
+    <div id="modal-{{ item.id }}" class="fixed inset-0 z-50 hidden bg-gray-800 bg-opacity-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen">
+        <!-- Modal content -->
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-6xl">
+          <h2 class="text-2xl font-bold mb-4 text-center">Rendiciones de Gasto</h2>
+          <!-- Tabla responsiva -->
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm text-left text-gray-500 border border-gray-300">
+              <thead class="text-xs uppercase bg-gray-100 text-gray-700 border-b">
+                <tr>
+                  <th class="px-4 py-2 border-r">Proveedor</th>
+                  <th class="px-4 py-2 border-r">Descripcion</th>
+                  <th class="px-4 py-2 border-r">Numero de Comprobante</th>
+                  <th class="px-4 py-2 border-r">Tipo de Comprobante</th>
+                  <th class="px-4 py-2 border-r">Importe</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 1</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 2</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 3</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for rendicion in item.rendiciones %}
+                  <tr class="bg-white hover:bg-gray-50 border-b">
+                    <td class="px-4 py-2 border-r">{{ rendicion.proveedor.razon_social }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.descripcion }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.numero_requerimiento }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.tipo_comprobante }}</td>
+                    <td class="px-4 py-2 border-r text-right">{{ rendicion.importe|floatformat:2 }}</td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_1 %}
+                        {{ rendicion.concepto_nivel_1.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_2 %}
+                        {{ rendicion.concepto_nivel_2.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_3 %}
+                        {{ rendicion.concepto_nivel_3.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="9" class="px-4 py-2 text-center">No hay rendiciones disponibles.</td>
+                  </tr>
+                {% endfor %}
+                {% if item.rendiciones %}
+                  <tr class="bg-gray-200 font-bold">
+                    <td colspan="5" class="px-4 py-2 text-right">Total:</td>
+                    <td class="px-4 py-2 text-right">{{ item.total_importe|floatformat:2 }}</td>
+                    <td colspan="3"></td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          <button class="mt-4 bg-blue-500 text-white px-4 py-2 rounded" onclick="closeModal('modal-{{ item.id }}')">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endfor %}

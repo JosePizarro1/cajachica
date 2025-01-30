@@ -1,17 +1,25 @@
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EGATUR - Caja Chica</title>
-  
+  <!-- Favicon -->
+  <link rel="icon" href="{% static 'images/icon.png' %}" type="image/png">
+
   <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
   
+  <!-- Font Awesome CDN (versión 5.15.4) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
   <!-- Configuración de Tailwind -->
   <script>
     tailwind.config = {
@@ -42,38 +50,59 @@
       <nav class="mt-6">
         <!-- Dashboard -->
         <a href="{% url 'dashboard' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M3 9a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
-            <path d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
-            <path d="M3 13a1 1 0 011-1h8a1 1 0 110 2H4a1 1 0 01-1-1z" />
-          </svg>
+          <i class="fas fa-tachometer-alt mr-2"></i>
           Dashboard
         </a>
       
         <!-- Ingreso -->
         <a href="{% url 'ingreso' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M4 4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1H4zm3 7a1 1 0 011 1v2h4v-2a1 1 0 112 0v2a2 2 0 01-2 2H7a2 2 0 01-2-2v-2a1 1 0 011-1z" />
-            <path d="M8 9a2 2 0 114 0 2 2 0 01-4 0z" />
-          </svg>
+          <i class="fas fa-plus-circle mr-2"></i>
           Ingreso
         </a>
       
         <!-- Gasto -->
         <a href="{% url 'gasto' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6 2a1 1 0 000 2h8a1 1 0 110 2H6a1 1 0 000 2h7a1 1 0 010 2H8a1 1 0 100 2h6a1 1 0 010 2H5a1 1 0 110-2h3a1 1 0 100-2H6a1 1 0 110-2h8a1 1 0 110 2H6a1 1 0 010-2H9a1 1 0 110-2H6a1 1 0 010-2z" />
-          </svg>
+          <i class="fas fa-minus-circle mr-2"></i>
           Gasto
         </a>
-      
+
         <!-- Rendición -->
         <a href="{% url 'rendicion' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm8-5a1 1 0 100 2 1 1 0 000-2zM7 8a1 1 0 100 2h2.5a.5.5 0 01.5.5V12a1 1 0 102 0v-1.5A2.5 2.5 0 009.5 8H7z" clip-rule="evenodd" />
-          </svg>
+          <i class="fas fa-file-invoice mr-2"></i>
           Rendición
         </a>
+
+        <!-- Caja Chica -->
+        <a href="{% url 'caja_chica' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+          <i class="fas fa-cash-register mr-2"></i>
+          Caja Chica
+        </a>
+
+        <!-- Proveedores -->
+        <a href="{% url 'proveedores' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+          <i class="fas fa-truck mr-2"></i>
+          Proveedores
+        </a>
+
+        <!-- Reportes -->
+        <a href="{% url 'reportes' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+          <i class="fas fa-chart-bar mr-2"></i>
+          Reportes
+        </a>
+
+        <!-- Conceptos -->
+        <a href="{% url 'conceptos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+          <i class="fas fa-list-alt mr-2"></i>
+          Conceptos
+        </a>
+        <!-- Préstamos (solo si el usuario es staff) -->
+{% if user.is_staff %}
+  <a href="{% url 'prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+    <i class="fas fa-hand-holding-usd mr-2"></i>
+    Préstamos
+  </a>
+{% endif %}
+
       </nav>
     </aside>
     
@@ -81,25 +110,36 @@
     <main class="flex-1 flex flex-col min-h-screen">
         <!-- Topbar -->
         <header class="bg-white shadow p-4 flex justify-between items-center">
-          <div class="flex items-center">
-            <button id="sidebar-toggle" class="text-gray-500 md:hidden">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M2 4a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1zM2 10a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1zM2 16a1 1 0 011-1h14a1 1 0 110 2H3a1 1 0 01-1-1z" clip-rule="evenodd"/>
-              </svg>
-            </button>
-            <h2 class="text-xl font-bold text-primary ml-2">Dashboard</h2>
-          </div>
-          <div>
-            <button class="px-4 py-2 bg-secondary text-white rounded hover:bg-gray-800 flex items-center">
-              Cerrar Sesión
-            </button>
-          </div>
+            <div class="flex items-center">
+                <button id="sidebar-toggle" class="text-gray-500 md:hidden">
+                    <i class="fas fa-bars h-6 w-6"></i>
+                </button>
+            </div>
+            <div class="flex items-center">
+                {% if user.is_authenticated %}
+                    <span class="mr-4 text-gray-700 font-bold flex items-center">
+                        <i class="fas fa-user-circle mr-2 text-indigo-600"></i>
+                        <span>{{ user.username }}</span>
+                    </span>
+                {% else %}
+                    <span class="mr-4 text-gray-700 font-bold flex items-center">
+                        <i class="fas fa-user-alt mr-2 text-gray-500"></i>
+                        <span>Invitado</span>
+                    </span>
+                {% endif %}
+
+                <form method="POST" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="px-4 py-2 bg-secondary text-white rounded hover:bg-gray-800 flex items-center">
+                        <i class="fas fa-sign-out-alt mr-2"></i>
+                    </button>
+                </form>
+            </div>
         </header>
 
         <!-- Aquí se carga el contenido de las vistas específicas -->
         <div class="p-6 overflow-y-auto">
           {% block content %}
-          <!-- El contenido específico de cada vista se cargará aquí -->
           {% endblock %}
         </div>
     </main>

@@ -1,85 +1,91 @@
 {% extends 'base.html' %}
 
 {% block content %}
-      <main class="flex-1 p-8">
-        <h2 class="text-3xl font-bold mb-6">Caja Rendición</h2>
-      
-        <!-- Formulario -->
-        <div class="bg-white shadow-md rounded-lg p-6">
-          <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      
-            <!-- Código de Requerimiento -->
-            <div>
-              <label for="codigo_requerimiento" class="block text-sm font-medium text-gray-700">Código de Requerimiento:</label>
-              <input type="text" id="codigo_requerimiento" name="codigo_requerimiento" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Ej. REQ001">
-            </div>
-      
-            <!-- Persona (Nombre) -->
-            <div>
-              <label for="persona" class="block text-sm font-medium text-gray-700">Persona (Nombre):</label>
-              <input type="text" id="persona" name="persona" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Nombre de la persona">
-            </div>
-      
-            <!-- Fecha Automática -->
-            <div>
-              <label for="fecha" class="block text-sm font-medium text-gray-700">Fecha:</label>
-              <input type="date" id="fecha" name="fecha" value="{{ today }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" readonly>
-            </div>
-      
-            <!-- Monto -->
-            <div>
-              <label for="monto" class="block text-sm font-medium text-gray-700">Monto:</label>
-              <input type="number" id="monto" name="monto" step="0.01" placeholder="0.00" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300">
-            </div>
-      
-            <!-- Método de Pago -->
-            <div>
-              <label for="metodo_pago" class="block text-sm font-medium text-gray-700">Método de Pago:</label>
-              <select id="metodo_pago" name="metodo_pago" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" onchange="toggleTransferencia()">
-                <option value="efectivo">Efectivo</option>
-                <option value="yape">Yape</option>
-                <option value="transferencia">Transferencia</option>
-              </select>
-            </div>
-      
-            <!-- Número de Transferencia (visible solo si el método de pago es Transferencia) -->
-            <div id="numero_transferencia" style="display: none;">
-              <label for="numero_transferencia_input" class="block text-sm font-medium text-gray-700">Número de Transferencia:</label>
-              <input type="text" id="numero_transferencia_input" name="numero_transferencia_input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Número de transferencia">
-            </div>
-      
-            <!-- Sede -->
-            <div>
-              <label for="sede" class="block text-sm font-medium text-gray-700">Sede:</label>
-              <select id="sede" name="sede" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300">
-                <option value="focus">FOCUS</option>
-                <option value="egatur">EGATUR</option>
-              </select>
-            </div>
-      
-            <!-- Botón de Guardar -->
-            <div class="col-span-1 md:col-span-2 lg:col-span-3 text-right">
-              <button type="submit" class="bg-accent text-white px-4 py-2 rounded shadow hover:bg-green-600 transition duration-300">
-                Guardar
-              </button>
-            </div>
-          </form>
-        </div>
-      </main>
-      
-      <!-- Script para mostrar el campo de "Número de Transferencia" si se selecciona "Transferencia" -->
-      <script>
-        function toggleTransferencia() {
-          const metodoPago = document.getElementById('metodo_pago').value;
-          const numeroTransferencia = document.getElementById('numero_transferencia');
-          
-          if (metodoPago === 'transferencia') {
-            numeroTransferencia.style.display = 'block'; // Muestra el campo de número de transferencia
-          } else {
-            numeroTransferencia.style.display = 'none'; // Oculta el campo de número de transferencia
-          }
-        }
-      </script>
+<meta charset="UTF-8">
+<!-- Incluye el estilo de DataTables -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+<main class="container mx-auto py-8">
+  <h2 class="text-3xl font-bold mb-6">Registrar Rendición</h2>
+
+  <!-- Tabla de Gastos -->
+  <div class="bg-white shadow-md rounded-lg overflow-hidden">
+    <div class="bg-gray-800 text-white p-4">
+      <h3 class="text-lg font-bold">Seleccionar un Gasto</h3>
+    </div>
+    <div class="p-4">
+      <table id="tabla-gastos" class="min-w-full table-auto border-collapse">
+        <thead class="bg-gray-700 text-white">
+          <tr>
+            <th class="px-4 py-2 text-left">Nombre</th>
+            <th class="px-4 py-2 text-left">Concepto</th>
+            <th class="px-4 py-2 text-left">Local</th>
+            <th class="px-4 py-2 text-left">Moneda</th>
+            <th class="px-4 py-2 text-left">Fecha de Gasto</th>
+            <th class="px-4 py-2 text-left">Observación</th>
+            <th class="px-4 py-2 text-left">Importe</th>
+            <th class="px-4 py-2 text-left">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-300">
+          {% for gasto in gastos %}
+          <tr class="hover:bg-gray-100">
+            <td class="px-4 py-2">{{ gasto.nombre_proveedor|default:"Sin proveedor" }}</td>
+            <td class="px-4 py-2">{{ gasto.concepto_mayor_nivel.concepto_nombre }}</td>
+            <td class="px-4 py-2">{{ gasto.local.nombre_local }}</td>
+            <td class="px-4 py-2">{{ gasto.moneda }}</td>
+            <td class="px-4 py-2">{{ gasto.fecha_gasto|date:"d/m/Y" }}</td>
+            <td class="px-4 py-2">{{ gasto.observacion|default:"Sin observación" }}</td>
+            <td class="px-4 py-2">{{ gasto.importe }}</td>
+            <td class="px-4 py-2">
+              {% if gasto.usuario_creador.is_active %}
+                <a href="{% url 'registrar_rendiciones' gasto.id %}" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded text-sm inline-flex items-center">
+                  <!-- Font Awesome icon -->
+                  <i class="fas fa-check-circle mr-1"></i>
+                  Rendir
+                </a>
+              {% else %}
+                <button class="bg-gray-500 text-white font-bold py-1 px-3 rounded text-sm inline-flex items-center cursor-not-allowed" disabled>
+                  <!-- Font Awesome icon -->
+                  <i class="fas fa-ban mr-1"></i>
+                  Rendir (Inactivo)
+                </button>
+              {% endif %}
+            </td>
+
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+  $(document).ready(function() {
+    $('#tabla-gastos').DataTable({
+      "language": {
+        "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
+      },
+      "order": [[1, "desc"]], // Ordenar por Fecha de Gasto de mayor a menor
+      "pagingType": "simple_numbers" // Control de paginación más compacto
+    });
+  });
+</script>
+
+<!-- Incluyendo mensajes -->
+{% include 'mensaje.html' %}
 {% endblock %}
- 

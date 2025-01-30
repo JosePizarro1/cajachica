@@ -1,0 +1,381 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<meta charset="UTF-8">
+<style>
+    /* Responsividad en diferentes tama帽os de pantalla */
+@media (min-width: 768px) {
+  .modal-container {
+    width: 75%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .modal-container {
+    width: 66.66%;
+  }
+}
+
+</style>
+<!-- Cargar jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- Cargar CSS de DataTables -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
+
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<main class="flex-1 p-2">
+
+<form method="GET" action="" class="mb-2">
+  <div class="container mx-auto p-2 bg-gray-100 rounded-md shadow-md">
+    <div class="flex items-center space-x-2">
+      <div class="flex-1">
+        <label for="fecha_inicio" class="block text-xs font-medium text-gray-700 mb-1">Fecha Inicio</label>
+        <div class="relative">
+          <input 
+            type="date" 
+            id="fecha_inicio" 
+            name="fecha_inicio" 
+            value="{{ request.GET.fecha_inicio|default:fecha_hoy }}" 
+            class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
+          <span class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+            <i class="fas fa-calendar-alt"></i>
+          </span>
+        </div>
+      </div>
+      <div class="flex-1">
+        <label for="fecha_fin" class="block text-xs font-medium text-gray-700 mb-1">Fecha Fin</label>
+        <div class="relative">
+          <input 
+            type="date" 
+            id="fecha_fin" 
+            name="fecha_fin" 
+            value="{{ request.GET.fecha_fin|default:fecha_hoy }}" 
+            class="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-200">
+          <span class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
+            <i class="fas fa-calendar-alt"></i>
+          </span>
+        </div>
+      </div>
+      <div class="flex items-center">
+        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200">
+          Filtrar
+        </button>
+      </div>
+    </div>
+  </div>
+</form>
+
+
+
+
+    
+<!-- Bloque de Modales -->
+{% for item in movimientos %}
+  {% if item.tipo == "Gasto" %}
+    <div id="modal-{{ item.id }}" class="fixed inset-0 z-50 hidden bg-gray-800 bg-opacity-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen">
+        <!-- Modal content -->
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-6xl">
+          <h2 class="text-2xl font-bold mb-4 text-center">Rendiciones de Gasto</h2>
+          <!-- Tabla responsiva -->
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm text-left text-gray-500 border border-gray-300">
+              <thead class="text-xs uppercase bg-gray-100 text-gray-700 border-b">
+                <tr>
+                  <th class="px-4 py-2 border-r">Proveedor</th>
+                  <th class="px-4 py-2 border-r">Descripcion</th>
+                  <th class="px-4 py-2 border-r">Numero de Comprobante</th>
+                  <th class="px-4 py-2 border-r">Tipo de Comprobante</th>
+                  <th class="px-4 py-2 border-r">Importe</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 1</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 2</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 3</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for rendicion in item.rendiciones %}
+                  <tr class="bg-white hover:bg-gray-50 border-b">
+                    <td class="px-4 py-2 border-r">{{ rendicion.proveedor.razon_social }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.descripcion }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.numero_requerimiento }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.tipo_comprobante }}</td>
+                    <td class="px-4 py-2 border-r text-right">{{ rendicion.importe|floatformat:2 }}</td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_1 %}
+                        {{ rendicion.concepto_nivel_1.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_2 %}
+                        {{ rendicion.concepto_nivel_2.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_3 %}
+                        {{ rendicion.concepto_nivel_3.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="9" class="px-4 py-2 text-center">No hay rendiciones disponibles.</td>
+                  </tr>
+                {% endfor %}
+                {% if item.rendiciones %}
+                  <tr class="bg-gray-200 font-bold">
+                    <td colspan="5" class="px-4 py-2 text-right">Total:</td>
+                    <td class="px-4 py-2 text-right">{{ item.total_importe|floatformat:2 }}</td>
+                    <td colspan="3"></td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          <button class="mt-4 bg-blue-500 text-white px-4 py-2 rounded" onclick="closeModal('modal-{{ item.id }}')">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endfor %}
+
+
+
+
+
+<!-- Tabla de Resumen Diario -->
+<div class="bg-white shadow-md rounded-lg p-2 overflow-auto">
+<h1 class="text-xl font-bold text-center  text-indigo-800 p-1 rounded-lg shadow-md mb-2">
+  Movimientos del {{ rango_fechas }}
+</h1>
+<!-- Botón Descargar Excel -->
+<div class="text-right mb-4">
+  <button 
+    id="downloadExcelBtn" 
+    class="bg-green-500 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200">
+    Descargar Excel
+  </button>
+</div>
+
+    <table id="movimientos-table" class="w-full text-sm text-left text-gray-500 border border-gray-300">
+        <thead class="text-xs uppercase bg-gray-100 text-gray-700 border-b">
+            <tr>
+                <th class="px-4 py-2 border-r"></th>
+                <th class="px-4 py-2 border-r">Fecha</th>
+                {% if user.is_staff %}
+                    <th class="px-4 py-2 border-r">Usuario</th> <!-- Columna extra para el usuario -->
+                {% endif %}
+                <th class="px-4 py-2 border-r">Método de Pago</th>
+                <th class="px-4 py-2 border-r">Proveedor/Fondo</th>
+                <th class="px-4 py-2 border-r">Concepto</th>
+                <th class="px-4 py-2 border-r">Monto</th>
+                <th class="px-4 py-2 border-r">Observación</th>
+                <th class="px-4 py-2 text-center">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in movimientos %}
+            <tr class="bg-white hover:bg-gray-50 border-b 
+                {% if item.tipo == 'Gasto' %} 
+                    bg-red-100 text-red-700 
+                {% elif item.tipo == 'Extorno' %} 
+                    bg-yellow-100 text-yellow-700 
+                {% else %} 
+                    bg-green-100 text-green-700 
+                {% endif %} 
+                rounded-lg">
+                <td class="px-4 py-2 border-r">
+                    <span class="inline-block px-4 py-1 text-xs font-semibold uppercase rounded-full 
+                                {% if item.tipo == 'Gasto' %} 
+                                    bg-red-500 text-white 
+                                {% elif item.tipo == 'Extorno' %} 
+                                    bg-yellow-500 text-white 
+                                {% else %} 
+                                    bg-green-500 text-white 
+                                {% endif %}">
+                        {% if item.tipo == 'Gasto' %} Gasto {% elif item.tipo == 'Extorno' %} Extorno {% else %} Ingreso {% endif %}
+                    </span>
+                </td>
+                <td class="px-4 py-2 border-r">{{ item.fecha }}</td>
+                {% if user.is_staff %}
+                    <td class="px-4 py-2 border-r">{{ item.usuario_creador }}</td>
+                {% endif %}
+
+                <td class="px-4 py-2 border-r">{{ item.metodo_pago }}</td>
+                <td class="px-4 py-2 border-r">{{ item.proveedor }}</td>
+                <td class="px-4 py-2 border-r">{{ item.concepto }}</td>
+                <td class="px-4 py-2 border-r text-right font-bold">
+                    {% if item.moneda == 'Soles' %}
+                        S/{{ item.monto|floatformat:2 }}
+                    {% else %}
+                        ${{ item.monto|floatformat:2 }}
+                    {% endif %}
+                </td>
+                <td class="px-4 py-2 border-r">{{ item.notas }}</td>
+                <td class="px-4 py-2 text-center">
+                    {% if item.tipo == 'Gasto' and item.rendido %}
+                    <a href="#" class="text-blue-500 hover:text-blue-700" data-modal="modal-{{ item.id }}">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    {% endif %}
+                    {% if item.concepto == 'Exhorto' %}
+                        <a href="{% url 'edit_item' item.id item.tipo %}" class="text-yellow-500 hover:text-yellow-700">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </a>
+                    {% endif %}                    
+                                    
+                    {% if item.concepto == 'Requerimiento' and not item.rendido %}
+                    <p class="bg-red-500 text-white font-bold text-center py-2 px-4 rounded">Rendir</p>
+                    {% endif %}
+                                    
+                    {% if item.tipo == "Gasto" or item.tipo == "Extorno" %}
+                    <!-- Enlace que abre el modal -->
+                    <a href="javascript:void(0);" class="text-yellow-500 hover:text-yellow-700"
+                       data-bs-toggle="modal" 
+                       data-bs-target="#editModal" 
+                       data-id="{{ item.id }}" 
+                       data-concepto="{{ item.notas }}">
+                        <i class="fas fa-pen"></i>
+                    </a>
+                    {% endif %}
+                </td>
+
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+
+
+<div class="mt-6  p-6 ">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <p class="text-sm bg-blue-200 text-blue-900 shadow-xl p-4 rounded-lg border-4 border-blue-400 transform hover:scale-105 transition-transform duration-200">
+
+      Saldo Inicial: 
+      <span class="font-bold text-xl block">S/ {{ saldo_inicial|floatformat:2 }}</span>
+    </p>
+    <p class="text-sm bg-green-200 text-green-900 shadow-xl p-4 rounded-lg border-4 border-green-400 transform hover:scale-105 transition-transform duration-200">
+      Ingresos Totales: 
+      <span class="font-bold text-xl block">S/ {{ total_ingresos_soles|floatformat:2 }}</span>
+    </p>
+    <p class="text-sm bg-red-200 text-red-900 shadow-xl p-4 rounded-lg border-4 border-red-400 transform hover:scale-105 transition-transform duration-200">
+      Egresos Totales: 
+      <span class="font-bold text-xl block">S/ {{ total_egresos_soles|floatformat:2 }}</span>
+    </p>
+    <p class="text-sm bg-yellow-200 text-yellow-900 shadow-xl p-4 rounded-lg border-4 border-yellow-400 transform hover:scale-105 transition-transform duration-200">
+      Saldo Final: 
+      <span class="font-bold text-xl block">S/ {{ saldo_final|floatformat:2 }}</span>
+    </p>
+  </div>
+</div>
+
+
+
+
+
+</main>
+<div id="editModal" class="fixed inset-0 z-50 hidden bg-gray-800 bg-opacity-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen">
+        <!-- Modal content -->
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+            <h2 class="text-2xl font-bold mb-4 text-center">Editar Movimiento</h2>
+            <!-- Formulario de edición -->
+            <form id="updateForm" method="post" action="{% url 'actualizar_movimiento' %}">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="movimientoId" class="block text-sm font-medium text-gray-700">ID Movimiento</label>
+                    <input type="text" id="movimientoId" name="id" readonly class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+                </div>
+                <div class="mb-4">
+                    <label for="movimientoNotas" class="block text-sm font-medium text-gray-700">Notas</label>
+                    <textarea 
+                        id="movimientoNotas" 
+                        name="notas" 
+                        required 
+                        rows="5" 
+                        class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-y"
+                        placeholder="Escribe tus notas aquí..."></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-4">
+                    <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600" onclick="closeModal('editModal')">Cerrar</button>
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Actualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Script para mostrar y cargar datos en el modal
+    const editModalTrigger = document.querySelectorAll('[data-bs-toggle="modal"]');
+    const editModal = document.getElementById('editModal');
+
+    editModalTrigger.forEach(trigger => {
+        trigger.addEventListener('click', function () {
+            const id = this.getAttribute('data-id');
+            const notas = this.getAttribute('data-concepto');
+
+            const movimientoId = document.getElementById('movimientoId');
+            const movimientoNotas = document.getElementById('movimientoNotas');
+
+            movimientoId.value = id;
+            movimientoNotas.value = notas;
+
+            editModal.classList.remove('hidden');
+        });
+    });
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.add('hidden');
+    }
+</script>
+<script>
+$(document).ready(function() {
+  $('#movimientos-table').DataTable({
+    paging: false,   
+    info: false, 
+    searching: true
+
+  });
+});
+</script>
+
+<script>
+document.getElementById('downloadExcelBtn').addEventListener('click', function() {
+    // Capturar las fechas de los inputs
+    var fecha_inicio = document.getElementById('fecha_inicio').value;
+    var fecha_fin = document.getElementById('fecha_fin').value;
+
+    // Crear la URL con los parámetros de fecha
+    var url = "{% url 'descargarexcel' %}?fecha_inicio=" + fecha_inicio + "&fecha_fin=" + fecha_fin;
+
+    // Redirigir al usuario a la URL generada
+    window.location.href = url;
+});
+</script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modalLinks = document.querySelectorAll('[data-modal]');
+        
+        modalLinks.forEach(link => {
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
+                const modalId = this.getAttribute('data-modal');
+                document.getElementById(modalId).classList.remove('hidden');
+            });
+        });
+    });
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.add('hidden');
+    }
+</script>
+{% include 'mensaje.html' %}
+
+{% endblock %}

@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  .dynamic-section {
+    background-color: #343a40;
+    color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+  }
+  .dynamic-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 5px;
+  }
+  .dynamic-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: 14px;
+    background-color: #495057;
+    color: #fff;
+  }
+  .dynamic-input::placeholder {
+    color: #adb5bd;
+  }
+  .dynamic-input:focus {
+    outline: none;
+    border-color: #17a2b8;
+    box-shadow: 0 0 4px rgba(23, 162, 184, 0.5);
+  }
+  input[type="date"].dynamic-input {
+    color-scheme: dark;
+  }
+</style>
+
+<main class="flex-1 p-8">
+<h2 class="text-3xl font-bold mb-6">Editar Ingreso #{{ ingreso.id }}</h2>
+
+  <div class="bg-white shadow-md rounded-lg p-6">
+    <form method="POST" action="{% url 'editar_ingreso' ingreso.id %}" id="formulario-ingreso" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% csrf_token %}
+      
+<!-- Fecha -->
+<div>
+  <label for="fecha" class="block text-sm font-medium text-gray-700">Fecha:</label>
+  <input 
+    type="text" 
+    id="fecha" 
+    name="fecha" 
+    value="{{ ingreso.fecha_ingreso|date:'d/m/Y' }}" 
+    class="dynamic-input bg-gray-100 text-gray-500 cursor-not-allowed" 
+    readonly 
+  >
+</div>
+
+<!-- Importe -->
+<div>
+  <label for="importe" class="block text-sm font-medium text-gray-700">Importe:</label>
+  <input 
+    type="number" 
+    id="importe" 
+    name="importe" 
+    step="0.01" 
+    value="{{ ingreso.importe }}" 
+    class="dynamic-input bg-gray-100 text-gray-500 cursor-not-allowed" 
+    readonly
+  >
+</div>
+
+
+      <!-- Fondo -->
+      <div>
+        <label for="id_fondo" class="block text-sm font-medium text-gray-700">Fondo:</label>
+        <select id="id_fondo" name="id_fondo" class="dynamic-input" required>
+          {% for fondo in fondos %}
+          <option value="{{ fondo.id }}" {% if fondo.id == ingreso.id_fondo.id %}selected{% endif %}>{{ fondo.nombre_fondo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Metodo de Pago -->
+      <div>
+        <label for="metodo_pago" class="block text-sm font-medium text-gray-700">Metodo de Pago:</label>
+        <select id="metodo_pago" name="metodo_pago" class="dynamic-input">
+          <option value="efectivo" {% if ingreso.metodo_pago == "efectivo" %}selected{% endif %}>Efectivo</option>
+          <option value="yape" {% if ingreso.metodo_pago == "yape" %}selected{% endif %}>Yape</option>
+          <option value="transferencia" {% if ingreso.metodo_pago == "transferencia" %}selected{% endif %}>Transferencia</option>
+          <option value="giro" {% if ingreso.metodo_pago == "giro" %}selected{% endif %}>Giro</option>
+        </select>
+      </div>
+
+      <!-- Observacion -->
+      <div class="col-span-1 md:col-span-2 lg:col-span-3">
+        <label for="observacion" class="block text-sm font-medium text-gray-700">Observacion:</label>
+        <textarea id="observacion" name="observacion" rows="3" class="dynamic-input">{{ ingreso.observacion }}</textarea>
+      </div>
+
+      <!-- Botones -->
+      <div class="col-span-1 md:col-span-2 lg:col-span-3 text-right">
+        <a href="{% url 'caja_chica' %}" class="bg-gray-500 text-white px-4 py-2 rounded">Cancelar</a>
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700">
+          Guardar Cambios
+        </button>
+      </div>
+    </form>
+  </div>
+</main>
+
+<!-- Script para Confirmacion y Validacion -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const metodoPagoSelect = document.getElementById('metodo_pago');
+    const codigoOperacionContainer = document.getElementById('codigo-operacion-container');
+    const fechaOperacionContainer = document.getElementById('fecha-operacion-container');
+
+    
+    const btnGuardar = document.getElementById('btn-guardar');
+    const formulario = document.getElementById('formulario-ingreso');
+
+    // Mostrar/Ocultar campo Codigo de Operacion
+    metodoPagoSelect.addEventListener('change', () => {
+      if (metodoPagoSelect.value === 'transferencia' || metodoPagoSelect.value === 'yape' ) {
+        codigoOperacionContainer.style.display = 'block';
+        fechaOperacionContainer.style.display = 'block';
+      } else {
+        codigoOperacionContainer.style.display = 'none';
+        fechaOperacionContainer.style.display = 'none';
+      }
+    });
+
+    // Confirmacion antes de enviar el formulario
+    btnGuardar.addEventListener('click', (e) => {
+      e.preventDefault();
+      Swal.fire({
+        title: "¿Estas seguro?",
+        text: "Estas a punto de registrar un ingreso en la caja chica.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Si, guardar",
+        cancelButtonText: "Cancelar",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          formulario.submit();
+        }
+      });
+    });
+  });
+</script>
+{% include 'mensaje.html' %}
+
+{% endblock %}

@@ -1,210 +1,334 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% load static %}
+
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Incluyendo el CSS de Select2 -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+
 <main class="flex-1 p-8">
-  <h2 class="text-3xl font-bold mb-6">Registrar Gastos en Caja</h2>
+          <h2 class="text-3xl font-bold mb-6">Registrar Gastos en Caja</h2>
 
   <!-- Formulario -->
   <div class="bg-white shadow-md rounded-lg p-6">
-    <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% include 'mensaje.html' %}
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+      <!-- Fecha -->
+      <div>
+        <label for="fecha" class="block text-sm font-medium text-gray-700">Fecha:</label>
+        <input type="date" id="fecha" name="fecha" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent" required>
+      </div>
+
+      <!-- Importe -->
+      <div>
+        <label for="importe" class="block text-sm font-medium text-gray-700">Importe:</label>
+        <input type="number" id="importe" name="importe" step="0.01" placeholder="0.00" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent" required>
+      </div>
+
+        <!-- Tipo Comprobante -->
+        <div>
+          <label for="tipo_comprobante" class="block text-sm font-medium text-gray-700">Tipo Comprobante:</label>
+          <select id="tipo_comprobante" name="tipo_comprobante" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+            <option value="" selected disabled>Seleccione una opción</option>
+            <option value="Factura">Factura</option>
+            <option value="Boleta">Boleta</option>
+            <option value="Nota">Nota</option>
+            <option value="Proforma">Proforma</option>
+            <option value="Declaracion">Declaración</option>
+            <option value="RHE">RHE</option>
+            <option value="Requerimiento">Requerimiento</option>
+            <option value="Boleta de pago">Boleta de pago</option>
+          </select>
+        </div>
+        <!-- Campo Mes (Oculto dinámicamente) -->
+        <div id="campo-mes-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+          <label for="campo_mes" class="block text-sm font-medium">Mes:</label>
+          <select id="campo_mes" name="campo_mes" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="" selected disabled>Seleccione un mes</option>
+            <option value="Enero">Enero</option>
+            <option value="Febrero">Febrero</option>
+            <option value="Marzo">Marzo</option>
+            <option value="Abril">Abril</option>
+            <option value="Mayo">Mayo</option>
+            <option value="Junio">Junio</option>
+            <option value="Julio">Julio</option>
+            <option value="Agosto">Agosto</option>
+            <option value="Septiembre">Septiembre</option>
+            <option value="Octubre">Octubre</option>
+            <option value="Noviembre">Noviembre</option>
+            <option value="Diciembre">Diciembre</option>
+          </select>
+        </div>
+
+            <!-- ID Requerimiento (Oculto dinámicamente) -->
+      <div id="id-requerimiento-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+        <label for="id_requerimiento" class="block text-sm font-medium">ID Requerimiento:</label>
+        <input type="text" id="id_requerimiento" name="id_requerimiento" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="ID del requerimiento">
+      </div>
+            <!-- Numero de  Requerimiento (Oculto dinámicamente) -->
+      <div id="num-requerimiento-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+        <label for="num_requerimiento" class="block text-sm font-medium">
+            N° Requerimiento:</label>
+        <input type="text" id="num_requerimiento" name="num_requerimiento" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="N° del requerimiento">
+      </div>
       
-      <!-- Fecha de Registro -->
-      <div>
-        <label for="fecha" class="block text-sm font-medium text-gray-700">Fecha de Registro:</label>
-        <input type="date" id="fecha" name="fecha" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300">
-      </div>
-
-      <!-- Concepto (Nivel 1) -->
-      <div>
-        <label for="concepto" class="block text-sm font-medium text-gray-700">Concepto (Nivel 1):</label>
-        <select id="concepto" name="concepto" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" onchange="mostrarNivel2()">
-          <option value="gastos_personal">Gastos de Personal</option>
-          <option value="otros_gastos_personal">Otros Gastos de Personal</option>
-          <option value="servicios">Servicios</option>
-          <option value="otros_servicios">Otros Servicios</option>
-          <option value="servicios_especializados">Servicios Especializados</option>
-          <option value="publicidad">Publicidad</option>
-          <option value="imagen">Imagen</option>
-          <option value="compras">Compras</option>
-          <option value="gastos_academicos">Gastos Académicos</option>
-          <option value="gastos_institucionales">Gastos Institucionales</option>
-          <option value="talleres_verano">Talleres de Verano, Talleres y Capacitaciones</option>
-          <option value="tributos_municipales">Tributos Municipales</option>
-          <option value="impuestos_sunat">Impuestos SUNAT</option>
-          <option value="min_trabajo">Min. Trabajo</option>
-          <option value="gastos_diversos">Gastos Diversos</option>
-          <option value="proyectos">Proyectos</option>
-          <option value="pago_prestamos">Pago de Préstamos</option>
-          <option value="deuda_ano_anterior">Deuda Año Anterior</option>
-          <option value="fondo_wilfredo">Fondo Sr. Wilfredo</option>
-          <option value="fondo_edgard">Fondo Sr. Edgard</option>
+      <!-- Campo Área (Oculto dinámicamente) -->
+      <div id="campo-area-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+        <label for="campo_area" class="block text-sm font-medium">Área:</label>
+        <select id="campo_area" name="campo_area" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+          <option value="" selected disabled>Seleccione una opción</option>
+          <option value="Sistemas">Sistemas</option>
+          <option value="Académico">Académico</option>
+          <option value="Imagen">Imagen</option>
+          <option value="Gerencia">Gerencia</option>
+          <option value="Administración">Administración</option>
+          <option value="Marketing">Marketing</option>
+          <option value="Ventas">Ventas</option>
         </select>
       </div>
+      
+        <!-- Código de Comprobante -->
+        <div id="codigo-comprobante-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+            <label for="num_comprobante" class="block text-sm font-medium">Número de Comprobante:</label>
+            <input type="text" id="num_comprobante" name="num_comprobante" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="Número de comprobante">
+        </div>
+        
+        <!-- Fecha de Emisión del Comprobante -->
+        <div id="fecha-emision-comprobante-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+            <label for="fecha_emision_comprobante" class="block text-sm font-medium">Fecha de Emisión:</label>
+            <input type="date" id="fecha_emision_comprobante" name="fecha_emision_comprobante" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        
 
-  <!-- Concepto (Nivel 2) -->
-  <div class="form-group hidden" id="nivel2">
-    <label for="nivel2_concepto">Concepto (Nivel 2):</label>
-    <select id="nivel2_concepto" name="nivel2_concepto">
-      <!-- Opciones Nivel 2 para "Gastos de Personal" -->
-      <optgroup label="Gastos de Personal" class="nivel2-gastos_personal">
-        <option value="administrativo">Administrativo</option>
-        <option value="docentes">Docentes</option>
-        <option value="admin_docente">Admin. y Docente</option>
-      </optgroup>
-    </select>
-  </div>
-
-<!-- Concepto (Nivel 3) -->
-<div class="form-group hidden" id="nivel3">
-  <label for="nivel3_concepto">Concepto (Nivel 3):</label>
-  <select id="nivel3_concepto" name="nivel3_concepto">
-    <!-- Opciones Nivel 3 para "Administrativo" -->
-    <optgroup label="Administrativo" class="nivel3-administrativo">
-      <option value="administrativos_planilla">Administrativos en Planilla</option>
-      <option value="administrativos_no_planilla">Administrativos no están en Planilla</option>
-    </optgroup>
-    <!-- Opciones Nivel 3 para "Docentes" -->
-    <optgroup label="Docentes" class="nivel3-docentes">
-      <option value="docentes_planilla">Docentes en Planilla</option>
-      <option value="docentes_no_planilla">Docentes no están en Planilla</option>
-    </optgroup>
-    <!-- Opciones Nivel 3 para "Admin. y Docente" -->
-    <optgroup label="Admin. y Docente" class="nivel3-admin_docente">
-      <option value="afp">AFP</option>
-      <option value="onp">ONP</option>
-      <option value="renta_5ta_categoria">Renta de 5ta Categoría</option>
-      <option value="prestamos_personal">Préstamos al Personal</option>
-      <option value="vacaciones">Vacaciones</option>
-      <option value="apoyo_donacion">Apoyo y/o Donación al Personal</option>
-    </optgroup>
-  </select>
-</div>
-
-
-      <!-- Nombre de Proveedor -->
+      <!-- Método de Pago -->
       <div>
-        <label for="proveedor" class="block text-sm font-medium text-gray-700">Nombre de Proveedor:</label>
-        <input type="text" id="proveedor" name="proveedor" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Nombre del proveedor">
-      </div>
-
-      <!-- Local -->
-      <div>
-        <label for="local" class="block text-sm font-medium text-gray-700">Local:</label>
-        <input type="text" id="local" name="local" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Nombre del local">
-      </div>
-
-      <!-- Documento / Tipo de Comprobante -->
-      <div>
-        <label for="documento" class="block text-sm font-medium text-gray-700">Documento / Tipo de Comprobante:</label>
-        <select id="documento" name="documento" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300">
-          <option value="factura">Factura</option>
-          <option value="boleta">Boleta</option>
-          <option value="nota">Nota</option>
-          <option value="proforma">Proforma</option>
-          <option value="declaracion">Declaración</option>
-          <option value="rhe">RHE</option>
-          <option value="requerimiento">Requerimiento</option>
-        </select>
-      </div>
-
-      <!-- Tipo de Pago -->
-      <div>
-        <label for="tipo_pago" class="block text-sm font-medium text-gray-700">Tipo de Pago:</label>
-        <select id="tipo_pago" name="tipo_pago" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300">
+        <label for="metodo_pago" class="block text-sm font-medium text-gray-700">Método de Pago:</label>
+        <select id="metodo_pago" name="metodo_pago" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
           <option value="efectivo">Efectivo</option>
           <option value="yape">Yape</option>
           <option value="transferencia">Transferencia</option>
         </select>
       </div>
-
-      <!-- Fecha de Operación y Código de Operación (solo si es Transferencia) -->
-      <div id="transferencia_fields" style="display: none;">
-        <div>
-          <label for="fecha_operacion" class="block text-sm font-medium text-gray-700">Fecha de Operación:</label>
-          <input type="date" id="fecha_operacion" name="fecha_operacion" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300">
-        </div>
-        <div>
-          <label for="codigo_operacion" class="block text-sm font-medium text-gray-700">Código de Operación:</label>
-          <input type="text" id="codigo_operacion" name="codigo_operacion" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300" placeholder="Código de operación">
-        </div>
+      <!-- Código de Operación (dinámico) -->
+      <div id="codigo-operacion-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+        <label for="codigo_operacion" class="block text-sm font-medium">Código de Operación:</label>
+        <input type="text" id="codigo_operacion" name="codigo_operacion" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="Código de operación">
       </div>
 
-      <!-- Descripción -->
+      <!-- Fecha de Operación (dinámico) -->
+      <div id="fecha-operacion-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+        <label for="fecha_operacion" class="block text-sm font-medium">Fecha de Operación:</label>
+        <input type="date" id="fecha_operacion" name="fecha_operacion" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+      </div>
+
+
+
+      <!-- Moneda -->
       <div>
-        <label for="descripcion" class="block text-sm font-medium text-gray-700">Descripción:</label>
-        <textarea id="descripcion" name="descripcion" rows="3" placeholder="Escribe aquí..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300"></textarea>
+        <label for="moneda" class="block text-sm font-medium text-gray-700">Moneda:</label>
+        <select id="moneda" name="moneda" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+          <option value="Soles">Soles</option>
+          <option value="Dolares">Dólares</option>
+        </select>
+      </div>
+
+      <!-- Local -->
+      <div>
+        <label for="local" class="block text-sm font-medium text-gray-700">Local:</label>
+        <select id="local" name="local" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+          {% for loc in locales %}
+          <option value="{{ loc.id }}">{{ loc.nombre_local }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+
+
+
+
+
+
+    <!-- Concepto Nivel 1 -->
+    <div>
+        <label for="concepto_nivel_1_results" class="block text-sm font-medium text-gray-700">Seleccionar Concepto Nivel 1:</label>
+        <select id="concepto_nivel_1_results" name="concepto_nivel_1_results" 
+                class="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+            <option value="">Seleccionar</option>
+            {% for concepto in nivel_1_conceptos %}
+                <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+
+      <!-- Concepto Nivel 2 -->
+    <div>
+        <label for="concepto_nivel_2_results" class="block text-sm font-medium text-gray-700">Seleccionar Concepto Nivel 2:</label>
+        <select id="concepto_nivel_2_results" name="concepto_nivel_2_results" class="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+            <option value="">Seleccionar</option>
+        </select>
+    </div>
+
+      <!-- Concepto Nivel 3 -->
+      <div>
+        <label for="concepto_nivel_3_filter" class="block text-sm font-medium text-gray-700">Buscar Concepto Nivel 3:</label>
+        <select id="concepto_nivel_3_results" name="concepto_nivel_3_results" class="mt-2 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+            <option value="">Seleccionar</option>
+        </select>
       </div>
 
       <!-- Observación -->
-      <div class="col-span-1 md:col-span-2 lg:col-span-3">
-        <label for="observacion" class="block text-sm font-medium text-gray-700">Observación:</label>
-        <textarea id="observacion" name="observacion" rows="3" placeholder="Escribe aquí..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent transition duration-300"></textarea>
+      <div >
+        <label for="observacion" class="block text-sm font-medium text-gray-700">Descripcion:</label>
+        <textarea id="observacion" name="observacion" rows="3" placeholder="Escribe aquí..." class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent"></textarea>
       </div>
 
-      <!-- Botón de Guardar -->
-      <div class="col-span-1 md:col-span-2 lg:col-span-3 text-right">
-        <button type="submit" class="bg-accent text-white px-4 py-2 rounded shadow hover:bg-green-600 transition duration-300">
-          Guardar
-        </button>
+    <!-- Nombre Proveedor -->
+  <div class="flex-1">
+      <label for="nombre_proveedor" class="block text-sm font-medium text-gray-700">Apellidos, Nombres y/o Proveedor:</label>
+      <div class="flex items-center space-x-2">
+        <select id="nombre_proveedor" name="nombre_proveedor"
+          class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+          <option value="" disabled selected>Selecciona un proveedor</option>
+          {% for proveedor in proveedores %}
+            <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+          {% endfor %}
+        </select>
       </div>
-    </form>
-  </div>
+    </div>
+    </div>
+
+
+
+    
+    
+      </div>
+            <!-- Botón de Guardar -->
+          <div class="col-span-1 md:col-span-2 lg:col-span-3 text-right mt-4">
+            <button type="button" id="btn-guardar" class="bg-accent text-white px-4 py-2 rounded shadow hover:bg-green-600">
+              Guardar
+            </button>
+        </div>
 </main>
 
-<!-- Script para manejar la visibilidad de los niveles del concepto y los campos de transferencia -->
+<!-- Script para Confirmación y Validación -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="{% static 'js/nombre_proveedor.js' %}"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const nivel1 = document.getElementById('concepto');
-    const nivel2 = document.getElementById('nivel2');
-    const nivel2Concepto = document.getElementById('nivel2_concepto');
-    const nivel3 = document.getElementById('nivel3');
-    const nivel3Concepto = document.getElementById('nivel3_concepto');
-    const tipoPago = document.getElementById('tipo_pago');
-    const transferenciaFields = document.getElementById('transferencia_fields');
-
-    // Mostrar Nivel 2 según Nivel 1
-    nivel1.addEventListener('change', () => {
-      const valorNivel1 = nivel1.value;
-
-      if (valorNivel1 === 'gastos_personal') {
-        nivel2.classList.remove('hidden');
-        nivel2Concepto.value = ''; // Reiniciar la selección
-        nivel3.classList.add('hidden'); // Ocultar Nivel 3 al cambiar Nivel 1
-      } else {
-        nivel2.classList.add('hidden');
-        nivel3.classList.add('hidden');
-      }
+    // Configurar csrf token
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+                xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+            }
+        }
     });
 
-    // Mostrar opciones de Nivel 3 según la selección en Nivel 2
-    nivel2Concepto.addEventListener('change', () => {
-      const valorNivel2 = nivel2Concepto.value;
+    $(document).ready(function() {
+        $('#concepto_nivel_2_results').select2();
+        $('#concepto_nivel_3_results').select2();
+        $('#concepto_nivel_1_results').select2();
+        $('#nombre_proveedor').select2();
 
-      // Ocultar todas las opciones de Nivel 3 inicialmente
-      const gruposNivel3 = nivel3Concepto.querySelectorAll('optgroup');
-      gruposNivel3.forEach(grupo => (grupo.style.display = 'none'));
+        $('#concepto_nivel_1_results').on('change', function() {
+            var conceptoId = $(this).val();
+            $.ajax({
+                url: '{% url "get_nivel_2_conceptos" %}',
+                data: {id_concepto_padre: conceptoId},
+                success: function(data) {
+                    $('#concepto_nivel_2_results').empty().append('<option value="">Seleccionar</option>');
+                    $.each(data, function(index, concepto) {
+                        $('#concepto_nivel_2_results').append('<option value="' + concepto.id + '">' + concepto.concepto_nombre + '</option>');
+                    });
+                }
+            });
+        });
 
-      // Mostrar solo el grupo de opciones correspondiente
-      const grupoCorrespondiente = nivel3Concepto.querySelector(`optgroup.nivel3-${valorNivel2}`);
-      if (grupoCorrespondiente) {
-        grupoCorrespondiente.style.display = 'block';
-        nivel3.classList.remove('hidden');
-        nivel3Concepto.value = ''; // Reiniciar selección de Nivel 3
-      } else {
-        nivel3.classList.add('hidden'); // Si no hay grupo, ocultar Nivel 3
-      }
+        $('#concepto_nivel_2_results').on('change', function() {
+            var conceptoId = $(this).val();
+            $.ajax({
+                url: '{% url "get_nivel_3_conceptos" %}',
+                data: {id_concepto_padre: conceptoId},
+                success: function(data) {
+                    $('#concepto_nivel_3_results').empty().append('<option value="">Seleccionar</option>');
+                    $.each(data, function(index, concepto) {
+                        $('#concepto_nivel_3_results').append('<option value="' + concepto.id + '">' + concepto.concepto_nombre + '</option>');
+                    });
+                }
+            });
+        });
+
+        $('#btn-guardar').on('click', function() {
+            var fecha = $('#fecha').val();
+            var importe = $('#importe').val();
+            var metodo_pago = $('#metodo_pago').val();
+
+            // Validación básica
+            if (!fecha || !importe || !metodo_pago) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Por favor complete los campos obligatorios.'
+                });
+                return;
+            }
+
+            var formData = {
+                fecha: $('#fecha').val(),
+                importe: $('#importe').val(),
+                metodo_pago: $('#metodo_pago').val(),
+                moneda: $('#moneda').val(),
+                local: $('#local').val(),
+                tipo_comprobante: $('#tipo_comprobante').val(),
+                num_comprobante: $('#num_comprobante').val(), // Nuevo campo agregado
+                fecha_emision_comprobante: $('#fecha_emision_comprobante').val(), // Nuevo campo agregado
+                nombre_proveedor: $('#nombre_proveedor').val(),
+                observacion: $('#observacion').val(),
+                codigo_operacion: $('#codigo_operacion').val(),
+                fecha_operacion: $('#fecha_operacion').val(),
+                concepto_nivel_1: $('#concepto_nivel_1_results').val(),
+                concepto_nivel_2: $('#concepto_nivel_2_results').val(),
+                concepto_nivel_3: $('#concepto_nivel_3_results').val(),
+                id_requerimiento: $('#id_requerimiento').val(),   
+                num_requerimiento: $('#num_requerimiento').val(),   
+                campo_area: $('#campo_area').val(),
+                campo_mes: $('#campo_mes').val()
+
+            };
+
+
+            $.ajax({
+                type: 'POST',
+                url: '{% url "gasto" %}',
+                data: JSON.stringify(formData),
+                contentType: 'application/json',
+                success: function(response) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Éxito',
+                        text: 'Gasto registrado correctamente.'
+                    }).then(() => {
+                        window.location.href = '{% url "gasto" %}';
+                    });
+                },
+                error: function(xhr, status, error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: xhr.responseJSON ? xhr.responseJSON.error : 'Ha ocurrido un error inesperado.'
+                    });
+                }
+            });
+        });
     });
-
-    // Mostrar campos de transferencia si el tipo de pago es "Transferencia"
-    tipoPago.addEventListener('change', () => {
-      if (tipoPago.value === 'transferencia') {
-        transferenciaFields.style.display = 'block';
-      } else {
-        transferenciaFields.style.display = 'none';
-      }
-    });
-  });
 </script>
+
 
 
 {% endblock %}

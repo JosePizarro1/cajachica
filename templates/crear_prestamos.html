@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+
+    <div class="container mx-auto mt-10 p-5 bg-white rounded shadow-lg">
+        <h2 class="text-2xl font-bold text-center mb-5">Crear Préstamo</h2>
+
+        <form method="POST" id="form-prestamo">
+            {% csrf_token %}
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label for="fecha_prestamo" class="block text-sm font-medium text-gray-700">Fecha de Préstamo</label>
+                    <input type="date" name="fecha_prestamo" id="fecha_prestamo" class="block w-full px-4 py-2 border rounded-md" required>
+                </div>
+                <div>
+                    <label for="fecha_vencimiento" class="block text-sm font-medium text-gray-700">Fecha de Vencimiento</label>
+                    <input type="date" name="fecha_vencimiento" id="fecha_vencimiento" class="block w-full px-4 py-2 border rounded-md" required>
+                </div>
+                <div>
+                    <label for="numero_cuotas" class="block text-sm font-medium text-gray-700">Número de Cuotas</label>
+                    <input type="number" name="numero_cuotas" id="numero_cuotas" class="block w-full px-4 py-2 border rounded-md" required min="1">
+                </div>
+                <div>
+                    <label for="proveedor" class="block text-sm font-medium text-gray-700">Proveedor</label>
+                    <select name="proveedor" id="proveedor" class="block w-full px-4 py-2 border rounded-md" required>
+                        <option value="">Seleccione un proveedor</option>
+                        {% for proveedor in proveedores %}
+                            <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="tea" class="block text-sm font-medium text-gray-700">Tasa Efectiva Anual (TEA)</label>
+                    <input type="number" name="tea" id="tea" class="block w-full px-4 py-2 border rounded-md" required step="0.01">
+                </div>
+                <div>
+                    <label for="banco" class="block text-sm font-medium text-gray-700">Banco</label>
+                    <select name="banco" id="banco" class="block w-full px-4 py-2 border rounded-md" required>
+                        <option value="">Seleccione un banco</option>
+                        {% for banco in bancos %}
+                            <option value="{{ banco.id }}">{{ banco.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="analista" class="block text-sm font-medium text-gray-700">Analista</label>
+                    <input type="text" name="analista" id="analista" class="block w-full px-4 py-2 border rounded-md" required>
+                </div>
+                <div>
+                    <label for="monto" class="block text-sm font-medium text-gray-700">Monto del Préstamo</label>
+                    <input type="number" name="monto" id="monto" class="block w-full px-4 py-2 border rounded-md" required step="0.01">
+                </div>
+                <div>
+                    <label for="dia_pago" class="block text-sm font-medium text-gray-700">Día de Pago</label>
+                    <input type="number" name="dia_pago" id="dia_pago" class="block w-full px-4 py-2 border rounded-md" required min="1" max="31">
+                </div>
+                <div>
+                    <label for="estado" class="block text-sm font-medium text-gray-700">Estado</label>
+                    <select name="estado" id="estado" class="block w-full px-4 py-2 border rounded-md" required>
+                        <option value="proceso">En proceso</option>
+                        <option value="terminado">Terminado</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="local" class="block text-sm font-medium text-gray-700">Local</label>
+                    <select name="local" id="local" class="block w-full px-4 py-2 border rounded-md" required>
+                        <option value="">Seleccione un local</option>
+                        {% for local in locales %}
+                            <option value="{{ local.id }}">{{ local.nombre_local }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Préstamo Nuevo</label>
+                    <input type="checkbox" name="prestamo_nuevo" id="prestamo_nuevo" class="mt-2">
+                </div>
+                <div id="cuota_actual_div" style="display: none;">
+                    <label for="cuota_actual" class="block text-sm font-medium text-gray-700">Cuota Actual</label>
+                    <input type="number" name="cuota_actual" id="cuota_actual" class="block w-full px-4 py-2 border rounded-md" min="1">
+                </div>
+            </div>
+
+            <div class="text-center mt-5">
+                <button type="button" class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600" onclick="confirmarCreacion()">Crear Préstamo</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            $('#proveedor').select2();
+        });
+
+        $('#prestamo_nuevo').change(function() {
+            if (!this.checked) {
+                $('#cuota_actual_div').show();
+                $('#cuota_actual').prop('required', true);
+            } else {
+                $('#cuota_actual_div').hide();
+                $('#cuota_actual').prop('required', false);
+            }
+        });
+
+        function confirmarCreacion() {
+            if (!validarFormulario()) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Oops...',
+                    text: 'Por favor completa todos los campos requeridos'
+                });
+                return;
+            }
+
+            Swal.fire({
+                title: '¿Estás seguro?',
+                text: '¡Estás a punto de crear un nuevo préstamo!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, crear préstamo',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('form-prestamo').submit();
+                }
+            });
+        }
+
+        function validarFormulario() {
+            let valid = true;
+            $('input[required], select[required]').each(function() {
+                if ($(this).val().trim() === '') {
+                    valid = false;
+                }
+            });
+            return valid;
+        }
+    </script>
+<!-- Incluyendo mensajes -->
+{% include 'mensaje.html' %}
+
+{% endblock %}

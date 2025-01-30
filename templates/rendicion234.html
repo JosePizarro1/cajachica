@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+  /* Fondo oscuro con bordes redondeados y sombra */
+.dynamic-section {
+  background-color: #343a40; /* Fondo oscuro */
+  color: #fff; /* Texto blanco */
+  padding: 15px; /* Espaciado interno */
+  border-radius: 8px; /* Bordes redondeados */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Sombra ligera */
+  margin-bottom: 20px; /* Espaciado inferior */
+}
+
+/* Estilo de las etiquetas */
+.dynamic-label {
+  display: block; /* Ocupa toda la fila */
+  font-size: 14px; /*  del texto */
+  font-weight: 500; /* Peso intermedio */
+  margin-bottom: 5px; /* Espaciado inferior */
+}
+
+/* Estilo de los inputs */
+.dynamic-input {
+  width: 100%; /* Ancho completo */
+  padding: 10px; /* Espaciado interno */
+  border: 1px solid #ced4da; /* Borde gris claro */
+  border-radius: 5px; /* Bordes redondeados */
+  font-size: 14px; /* Tamano del texto */
+  background-color: #495057; /* Fondo oscuro del input */
+  color: #fff; /* Texto blanco */
+}
+
+/* Placeholder en color gris claro */
+.dynamic-input::placeholder {
+  color: #adb5bd; /* Gris claro */
+}
+
+/* Input en estado de enfoque */
+.dynamic-input:focus {
+  outline: none; /* Eliminar borde por defecto */
+  border-color: #17a2b8; /* Color del borde al enfocar */
+  box-shadow: 0 0 4px rgba(23, 162, 184, 0.5); /* Sombra al enfocar */
+}
+
+/* Cambiar el estilo del input type="date" para que coincida */
+input[type="date"].dynamic-input {
+  color-scheme: dark; /* Cambia el esquema de colores al oscuro para compatibilidad */
+}  
+</style>
+<main class="flex-1 p-8">
+  <h2 class="text-3xl font-bold mb-6">Registrar Gastos en Caja</h2>
+
+  <!-- Formulario -->
+  <div class="bg-white shadow-md rounded-lg p-6">
+<form method="POST"  id="formulario-gasto" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  {% csrf_token %}
+
+  <!-- C¨®digo de Operaci¨®n (din¨¢mico) -->
+  <div id="codigo-operacion-container" class="dynamic-section" style="display: none;">
+    <label for="codigo_operacion" class="dynamic-label">C¨®digo de Operaci¨®n:</label>
+    <input type="text" id="codigo_operacion" name="codigo_operacion" class="dynamic-input" placeholder="C¨®digo de operaci¨®n">
+  </div>
+
+  <!-- Fecha de Operaci¨®n (din¨¢mico) -->
+  <div id="fecha-operacion-container" class="dynamic-section" style="display: none;">
+    <label for="fecha_operacion" class="dynamic-label">Fecha de Operaci¨®n:</label>
+    <input type="date" id="fecha_operacion" name="fecha_operacion" class="dynamic-input">
+  </div>
+
+  <!-- Persona -->
+  <div>
+    <label for="persona" class="block text-sm font-medium text-gray-700">Persona:</label>
+    <input type="text" id="persona" name="persona" placeholder="Nombre de la persona" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+  </div>
+
+  <!-- Monto -->
+  <div>
+    <label for="monto" class="block text-sm font-medium text-gray-700">Monto:</label>
+    <input type="number" id="monto" name="monto" step="0.01" placeholder="0.00" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent" required>
+  </div>
+
+  <!-- M¨¦todo de Pago -->
+  <div>
+    <label for="metodo_pago" class="block text-sm font-medium text-gray-700">M¨¦todo de Pago:</label>
+    <select id="metodo_pago" name="metodo_pago" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+      <option value="efectivo">Efectivo</option>
+      <option value="yape">Yape</option>
+      <option value="transferencia">Transferencia</option>
+    </select>
+  </div>
+
+  <!-- Bot¨®n de Guardar -->
+  <div class="col-span-1 md:col-span-2 lg:col-span-3 text-right">
+    <button type="button" id="btn-guardar" class="bg-accent text-white px-4 py-2 rounded shadow hover:bg-green-600">
+      Guardar
+    </button>
+  </div>
+</form>
+
+  </div>
+</main>
+
+<!-- Script para Confirmaci¨®n y Validaci¨®n -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const metodoPagoSelect = document.getElementById('metodo_pago');
+    const codigoOperacionContainer = document.getElementById('codigo-operacion-container');
+    const fechaOperacionContainer = document.getElementById('fecha-operacion-container');
+
+    const btnGuardar = document.getElementById('btn-guardar');
+    const formulario = document.getElementById('formulario-gasto');
+
+    // Mostrar/Ocultar campo C¨®digo de Operaci¨®n
+    metodoPagoSelect.addEventListener('change', () => {
+      if (metodoPagoSelect.value === 'transferencia' || metodoPagoSelect.value === 'yape') {
+        codigoOperacionContainer.style.display = 'block';
+        fechaOperacionContainer.style.display = 'block';
+      } else {
+        codigoOperacionContainer.style.display = 'none';
+        fechaOperacionContainer.style.display = 'none';
+        
+      }
+    });
+
+    // Confirmaci¨®n antes de enviar el formulario
+    btnGuardar.addEventListener('click', (e) => {
+      e.preventDefault();
+      Swal.fire({
+        title: "Está seguro?",
+        text: "Est¨¢s a punto de registrar un gasto en la caja chica.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, guardar",
+        cancelButtonText: "Cancelar",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          formulario.submit();
+        }
+      });
+    });
+  });
+</script>
+
+<!-- Incluyendo mensajes -->
+{% include 'mensaje.html' %}
+{% endblock %}

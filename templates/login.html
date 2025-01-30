@@ -5,6 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{% static 'images/icon.png' %}" type="image/png">
     <title>Login</title>
     <!-- CSS de Bootstrap y iconos -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
@@ -103,22 +104,32 @@
             50% { transform: scale(1.1); }
         }
 
-        #toggle-dark-mode {
-            position: fixed;
+        /* Animación para la imagen de icono y mensaje de bienvenida */
+        .welcome-message {
+            position: absolute;
             bottom: 20px;
-            right: 20px;
-            background-color: #255A9E;
+            text-align: center;
+            width: 100%;
             color: white;
-            border: none;
-            border-radius: 50%;
-            padding: 10px;
-            font-size: 18px;
-            cursor: pointer;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+            display: none;
+            animation: showMessage 5s ease-out forwards;
         }
 
-        #toggle-dark-mode:hover {
-            background-color: #19497C;
+        .welcome-message img {
+            max-width: 50px;
+            margin-bottom: 10px;
+        }
+
+        .welcome-message p {
+            font-size: 18px;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+
+        @keyframes showMessage {
+            0% { opacity: 0; transform: translateY(50px); }
+            50% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(50px); }
         }
 
         /* Modo oscuro */
@@ -163,6 +174,12 @@
         </form>
     </div>
 
+    <!-- Mensaje de bienvenida con icono -->
+    <div class="welcome-message" id="welcome-message">
+        <img src="{% static 'images/icon.png' %}" alt="Icono de Bienvenida">
+        <p>Bienvenido a Caja Chica</p>
+    </div>
+
     <script>
         // Mostrar login con animación fade-in
         document.addEventListener('DOMContentLoaded', function() {
@@ -170,9 +187,13 @@
             setTimeout(function() {
                 loginContainer.classList.add('visible');
             }, 50);
+
+            // Mostrar el mensaje de bienvenida después de 2 segundos
+            setTimeout(function() {
+                const welcomeMessage = document.getElementById('welcome-message');
+                welcomeMessage.style.display = 'block';
+            }, 2000);
         });
-
-
     </script>
 </body>
 </html>

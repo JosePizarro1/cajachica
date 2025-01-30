@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleccionar Proveedor</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-xl mx-auto bg-white p-6 rounded shadow">
+        <h1 class="text-2xl font-bold mb-4">Seleccionar Proveedor</h1>
+
+        <!-- Nombre_proveedor -->
+        <div>
+            <label for="nombre_proveedor" class="block text-sm font-medium text-gray-700">Apellidos, Nombres y/o Proveedor:</label>
+            <div class="flex items-center space-x-2">
+                <input type="text" id="nombre_proveedor" name="nombre_proveedor" placeholder="Nombre del proveedor" 
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent" readonly>
+                <button id="clearInput" class="text-red-500 hover:text-red-700 text-sm font-bold">Borrar</button>
+            </div>
+            <ul id="suggestions" class="mt-2 bg-white border border-gray-300 rounded-md hidden"></ul>
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            const input = $('#nombre_proveedor');
+            const suggestions = $('#suggestions');
+            const clearInput = $('#clearInput');
+
+            input.on('input', function () {
+                const query = $(this).val();
+                if (query.length < 2) {
+                    suggestions.addClass('hidden');
+                    return;
+                }
+
+                $.ajax({
+                    url: '/api/proveedores/', // Ruta de tu API que devuelve proveedores
+                    method: 'GET',
+                    data: { search: query },
+                    success: function (data) {
+                        suggestions.empty().removeClass('hidden');
+                        data.forEach(function (proveedor) {
+                            suggestions.append(`<li class="p-2 cursor-pointer hover:bg-gray-100" data-id="${proveedor.id}">${proveedor.nombre_comercial || proveedor.razon_social}</li>`);
+                        });
+                    },
+                });
+            });
+
+            // Seleccionar proveedor
+            suggestions.on('click', 'li', function () {
+                const selectedName = $(this).text();
+                input.val(selectedName);
+                suggestions.addClass('hidden');
+                input.attr('readonly', true); // Hacer el input solo lectura
+            });
+
+            // Limpiar input
+            clearInput.on('click', function () {
+                input.val('');
+                input.attr('readonly', false); // Hacer el input editable nuevamente
+                suggestions.addClass('hidden');
+            });
+
+            // Deshabilitar borrar desde teclado
+            input.on('keydown', function (e) {
+                if (e.key === 'Backspace' && input.attr('readonly')) {
+                    e.preventDefault(); // Evitar la acción por defecto del teclado
+                }
+            });
+        });
+    </script>
+</body>
+</html>

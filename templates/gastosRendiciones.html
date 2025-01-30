@@ -1,0 +1,550 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <!-- Enlace CDN de Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <!-- Incluyendo el CSS de Select2 -->
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Incluyendo el CSS de Select2 -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+
+
+<style>
+    select {
+    width: 200px; /* Cambia este valor al tamaño que necesites */
+
+  box-sizing: border-box; /* Asegura que el padding y el borde estén incluidos en el ancho */
+}
+ .bg-white {
+    background: linear-gradient(to bottom, #ffffff, #f7fafc); /* Fondo degradado */
+  }
+  #total-importe {
+    color: #2d3748; /* Color inicial (gris oscuro) */
+    transition: color 0.3s ease, font-size 0.3s ease;
+  }
+  #total-importe.updated {
+    color: #38a169; /* Color de éxito (verde) */
+    font-size: 1.5rem; /* Agranda el texto cuando se actualiza */
+  }
+    #estado.gasto {
+    background-color: #ffe2e2; /* Fondo rojo claro */
+    color: #e53e3e; /* Texto rojo oscuro */
+  }
+  #estado.ingreso {
+    background-color: #e6fffa; /* Fondo verde claro */
+    color: #38a169; /* Texto verde oscuro */
+  }
+</style>
+<main class="container mx-auto py-8">
+  <h2 class="text-3xl font-bold mb-6">Registrar Rendiciones</h2>
+<div class="bg-gray-100 p-4 rounded shadow-md mb-6">
+  <h3 class="text-lg font-bold mb-2">Detalles del Gasto</h3>
+  <div class="grid grid-cols-3 gap-4">
+    <div>
+      <p class="text-gray-700"><strong>Fecha Gasto:</strong> {{ gasto.fecha_gasto }}</p>
+      <p class="text-gray-700"><strong>Nombre Proveedor:</strong> {{ gasto.nombre_proveedor }}</p>
+    </div>
+    <div>
+      <p class="text-gray-700"><strong>Local:</strong> {{ gasto.local }}</p>
+      <p class="text-gray-700"><strong>Importe:</strong> {{ gasto.importe }}</p>
+    </div>
+    <div>
+      <p class="text-gray-700"><strong>Moneda:</strong> {{ gasto.moneda }}</p>
+      <p class="text-gray-700"><strong>Observación:</strong> {{ gasto.observacion }}</p>
+    </div>
+  </div>
+</div>
+  <!-- Formulario -->
+    {% csrf_token %}
+    <input type="hidden" name="gasto_id" value="{{ gasto.id }}" /> <!-- Campo oculto para el ID del Gasto -->
+
+    <!-- Campo de Importes Totales -->
+    <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+      <!-- Título -->
+      <h3 class="text-2xl font-semibold text-gray-800 mb-4">Rendición</h3>
+      
+      <!-- Contenedor del importe inicial -->
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-gray-600 text-lg font-medium">Importe del Gasto:</span>
+        <span class="text-green-600 text-2xl font-bold" id="importe-inicial"  data-importe="{{ gasto.importe }}">
+        {{ gasto.importe|floatformat:2 }}
+        </span>
+      </div>
+     
+      <!-- Contenedor del importe total -->
+      <div class="flex items-center justify-between mb-4">
+        <span class="text-gray-600 text-lg font-medium">Importe Total:</span>
+        <span id="total-importe" class="text-green-600 text-2xl font-bold">
+          0.00
+        </span>
+      </div>
+      
+      <!-- Separador -->
+      <hr class="border-gray-300 my-4">
+      
+      <!-- Contenedor del resultado -->
+      <div class="flex items-center justify-between">
+        <!-- Texto del estado -->
+        <span id="estado" class="text-lg font-bold rounded-full px-4 py-2 bg-blue-100 text-blue-600">
+          Ingreso
+        </span>
+        <!-- Valor del resultado -->
+        <span id="resultado" class="text-2xl font-semibold text-gray-800">
+          0.00
+        </span>
+      </div>
+    </div>
+
+    <!-- Tabla dinámica de rendiciones -->
+    <div class="bg-white p-4 rounded shadow-md">
+      <h3 class="text-lg font-bold mb-4">Detalle de Rendiciones</h3>
+      
+      <table class="min-w-full table-auto border-collapse mb-4">
+        <thead class="bg-gray-700 text-white">
+          <tr>
+            <th class="px-4 py-2">Fecha de Operación</th>
+            <th class="px-4 py-2">Apellidos y Nombres/Proveedor</th>
+            <th class="px-4 py-2">Descripción</th>
+            <th class="px-4 py-2">N° de Comprobante</th>
+            <th class="px-4 py-2">Tipo de Comprobante</th>
+            <th class="px-4 py-2">Importe</th>
+            <th class="px-4 py-2">Concepto Nivel 1</th>
+            <th class="px-4 py-2">Concepto Nivel 2</th>
+            <th class="px-4 py-2">Concepto Nivel 3</th>
+            <th class="px-4 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="rendiciones-body" class="divide-y divide-gray-300">
+          <!-- Fila inicial -->
+          <tr class="hover:bg-gray-100">
+            <td class="px-4 py-2"><input type="date" name="rendiciones[0][fecha_operacion]" class="w-full border-gray-300 rounded" required /></td>
+            
+        <td class="px-4 py-2">
+            <div>
+                <div class="flex items-center space-x-2">
+                    <select id="nombre_proveedor" name="rendiciones[0][nombre_proveedor]" 
+                        class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
+                        <option value="" disabled selected>Seleccione un proveedor</option>
+                        {% for proveedor in proveedores %}
+                            <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </td>
+
+            
+    <td class="px-4 py-2"><input type="text" name="rendiciones[0][descripcion]" class="w-full border-gray-300 rounded" placeholder="Descripción" /></td>
+    
+    
+    
+            <td class="px-4 py-2"><input type="text" name="rendiciones[0][numero_requerimiento]" class="w-full border-gray-300 rounded" placeholder="N° de Comprobante" required /></td>
+      <td class="px-4 py-2">
+        <select name="rendiciones[0][tipo_requerimiento]" class="w-full border-gray-300 rounded" required>
+          <option value="">Seleccione</option>
+          <option value="Factura">Factura</option>
+          <option value="Boleta">Boleta</option>
+          <option value="Nota">Nota</option>
+          <option value="Proforma">Proforma</option>
+          <option value="Declaracion">Declaración</option>
+          <option value="RHE">RHE</option>
+        <option value="Requerimiento">Requerimiento</option>
+              <option value="Boleta de pago">Boleta de pago</option>
+      
+        </select>
+      </td>
+      <td class="px-4 py-2"><input type="number" name="rendiciones[0][importe]" step="0.01" class="w-full border-gray-300 rounded importe-field" placeholder="Importe" required /></td>
+            <td class="px-4 py-2">
+              <select id="rendiciones[0][concepto_nivel_1]" name="rendiciones[0][concepto_nivel_1]" class="w-full border-gray-300 rounded">
+                <option value="">Seleccione</option>
+                {% for concepto in conceptos_nivel_1 %}
+                <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <!-- Concepto Nivel 2 -->
+            <td class="px-4 py-2">
+                <select id="rendiciones[0][concepto_nivel_2]" name="rendiciones[0][concepto_nivel_2]" class="w-full border-gray-300 rounded">
+                    <option value="">Seleccione</option>
+                </select>
+            </td>
+            <!-- Concepto Nivel 3 -->
+            <td class="px-4 py-2">
+                <select id="rendiciones[0][concepto_nivel_3]" name="rendiciones[0][concepto_nivel_3]" class="w-full border-gray-300 rounded">
+                    <option value="">Seleccione</option>
+                </select>
+            </td>
+            <td class="px-4 py-2 text-center">
+
+            </td>
+
+          </tr>
+        </tbody>
+      </table>
+      
+      <!-- Botones -->
+      <div class="flex justify-between">
+        <button id="add-row" type="button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+          </svg>
+          Agregar Rendición
+        </button>
+        
+        <button id="confirm-save" type="button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+            Guardar
+        </button>
+      </div>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    $(document).ready(function () {
+    $('select[name^="rendiciones"][name$="[concepto_nivel_1]"]').select2({
+        width: '150px' // Cambia a tu preferencia, como '100%' o 'auto'
+    });
+    $('select[name^="rendiciones"][name$="[concepto_nivel_2]"]').select2({
+        width: '150px'
+    });
+    $('select[name^="rendiciones"][name$="[concepto_nivel_3]"]').select2({
+        width: '150px'
+    });
+    // Inicialización de Select2 para el select de proveedores
+    $('select[name^="rendiciones"][name$="[nombre_proveedor]"]').select2({
+        width: '220px' // Cambia a tu preferencia
+    });
+
+    // Nivel 1 -> Nivel 2
+    $('table').on('change', 'select[name^="rendiciones"][name$="[concepto_nivel_1]"]', function () {
+        var conceptoNivel1Id = $(this).val(); // Obtener el ID seleccionado de Nivel 1
+        var nivel2Dropdown = $(this).closest('td').next().find('select'); // Dropdown de Nivel 2
+        var nivel3Dropdown = nivel2Dropdown.closest('td').next().find('select'); // Dropdown de Nivel 3
+        
+        nivel2Dropdown.empty().append('<option value="">Seleccione</option>'); // Limpiar Nivel 2
+        nivel3Dropdown.empty().append('<option value="">Seleccione</option>'); // Limpiar Nivel 3
+        
+        if (conceptoNivel1Id) {
+            $.ajax({
+                url: '{% url "get_nivel_2_conceptos" %}',
+                method: 'GET',
+                data: { id_concepto_padre: conceptoNivel1Id },
+                success: function (data) {
+                    $.each(data, function (index, concepto) {
+                        nivel2Dropdown.append('<option value="' + concepto.id + '">' + concepto.concepto_nombre + '</option>');
+                    });
+                },
+                error: function () {
+                    alert('Error al cargar los conceptos de nivel 2.');
+                }
+            });
+        }
+    });
+
+    // Nivel 2 -> Nivel 3
+    $('table').on('change', 'select[name^="rendiciones"][name$="[concepto_nivel_2]"]', function () {
+        var conceptoNivel2Id = $(this).val(); // Obtener el ID seleccionado de Nivel 2
+        var nivel3Dropdown = $(this).closest('td').next().find('select'); // Dropdown de Nivel 3
+        
+        nivel3Dropdown.empty().append('<option value="">Seleccione</option>'); // Limpiar Nivel 3
+        
+        if (conceptoNivel2Id) {
+            $.ajax({
+                url: '{% url "get_nivel_3_conceptos" %}',
+                method: 'GET',
+                data: { id_concepto_padre: conceptoNivel2Id },
+                success: function (data) {
+                    $.each(data, function (index, concepto) {
+                        nivel3Dropdown.append('<option value="' + concepto.id + '">' + concepto.concepto_nombre + '</option>');
+                    });
+                },
+                error: function () {
+                    alert('Error al cargar los conceptos de nivel 3.');
+                }
+            });
+        }
+    });
+});
+
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.querySelector('form');
+    const saveButton = document.getElementById('confirm-save');
+    const tableBody = document.getElementById('rendiciones-body');
+    const addRowButton = document.getElementById('add-row');
+    const totalImporte = document.getElementById('total-importe');
+    const resultado = document.getElementById('resultado');
+    const estado = document.getElementById('estado');
+    let indice = 1;
+    let rendicionesData = [];
+    const importeInicialElemento = document.getElementById('importe-inicial');
+    let importeInicial = importeInicialElemento.dataset.importe || "0";
+
+    // Función para reemplazar coma por punto y convertir a float
+    const convertirComaADecimal = (valor) => {
+        return parseFloat(valor.replace(',', '.')) || 0;
+    };
+
+    // Convertir el valor de importeInicial (que puede tener coma)
+    importeInicial = convertirComaADecimal(importeInicial);
+
+    // Depuración para verificar el valor correcto
+    console.log("Importe Inicial:", importeInicial);
+    // Función para calcular y actualizar el importe total
+    const actualizarImporteTotal = () => {
+        let totalImporteValor = 0;
+        const importes = tableBody.querySelectorAll('input[name*="[importe]"]');
+        importes.forEach(importe => {
+            totalImporteValor += parseFloat(importe.value) || 0;
+        });
+
+        // Truncar a 2 decimales
+        const truncarDosDecimales = (numero) => {
+            return Math.trunc(numero * 100) / 100;
+        };
+            totalImporteValor = truncarDosDecimales(totalImporteValor);
+
+        // Actualizar el campo de importe total
+        if (totalImporte) {
+            totalImporte.textContent = totalImporteValor.toFixed(2); // Mostrar siempre con 2 decimales
+        }
+
+
+        const diferencia = truncarDosDecimales(importeInicial - totalImporteValor);
+        // Console log para depurar valores
+        console.log("=== Depuración de cálculo ===");
+        console.log("Total Importes:", totalImporteValor);
+        console.log("Diferencia:", diferencia);
+        // Actualizar resultado y estado
+        if (resultado) {
+            resultado.textContent = diferencia.toFixed(2); // Mostrar siempre con 2 decimales
+        }
+        if (estado) {
+            if (diferencia < 0) {
+                estado.textContent = "Gasto";
+                estado.classList.remove('ingreso');
+                estado.classList.add('gasto');
+            } else {
+                estado.textContent = "Ingreso";
+                estado.classList.remove('gasto');
+                estado.classList.add('ingreso');
+            }
+        }
+    };
+
+    // Validar campos obligatorios
+    const validarCampos = () => {
+      let valido = true;
+      let mensajeError = '';
+
+      // Recorremos todas las filas de la tabla
+      const filas = tableBody.querySelectorAll('tr');
+      filas.forEach((fila, i) => {
+        const fechaOperacion = fila.querySelector(`input[name^="rendiciones[${i}][fecha_operacion]"]`);
+        const proveedor = fila.querySelector(`select[name^="rendiciones[${i}][nombre_proveedor]"]`);
+        const numeroRequerimiento = fila.querySelector(`input[name^="rendiciones[${i}][numero_requerimiento]"]`);
+        const importe = fila.querySelector(`input[name^="rendiciones[${i}][importe]"]`);
+        const tipoComprobante = fila.querySelector(`select[name^="rendiciones[${i}][tipo_requerimiento]"]`);
+
+        if (!fechaOperacion.value) {
+          valido = false;
+          mensajeError = `La "Fecha de Operación" es obligatoria en la fila ${i + 1}.`;
+        } else if (!proveedor.value) {
+          valido = false;
+          mensajeError = `El campo "Proveedor" es obligatorio en la fila ${i + 1}.`;
+        } else if (!numeroRequerimiento.value.trim()) {
+          valido = false;
+          mensajeError = `El campo "Número de Requerimiento" es obligatorio en la fila ${i + 1}.`;
+        } else if (!importe.value || parseFloat(importe.value) <= 0) {
+          valido = false;
+          mensajeError = `El "Importe" debe ser mayor a 0 en la fila ${i + 1}.`;
+        } else if (!tipoComprobante.value) {
+            valido = false;
+            mensajeError = `El campo "Tipo de Comprobante" es obligatorio en la fila ${i + 1}.`; // Validación añadida
+        }
+
+        // Si encontramos un error, dejamos de validar más filas
+        if (!valido) {
+          return false;
+        }
+      });
+
+      if (!valido) {
+        // Mostrar error con SweetAlert
+        Swal.fire({
+          title: 'Error',
+          text: mensajeError,
+          icon: 'error',
+          confirmButtonText: 'Aceptar'
+        });
+      }
+
+      return valido;
+    };
+
+saveButton.addEventListener('click', (e) => {
+    e.preventDefault(); // Evitar el envío inmediato del formulario
+    if (validarCampos()) {
+        Swal.fire({
+            title: 'Confirmación',
+            text: '¿Estás seguro de que deseas guardar los datos?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Guardar',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                let rendicionesData = [];
+                const filas = tableBody.querySelectorAll('tr');
+                filas.forEach((fila, i) => {
+                    const data = {
+                        fecha_operacion: fila.querySelector(`input[name^="rendiciones[${i}][fecha_operacion]"]`).value,
+                        apellidos_nombres_proveedor: fila.querySelector(`select[name^="rendiciones[${i}][nombre_proveedor]"]`).value,
+                        descripcion : fila.querySelector(`input[name^="rendiciones[${i}][descripcion]"]`).value,
+                        numero_requerimiento: fila.querySelector(`input[name^="rendiciones[${i}][numero_requerimiento]"]`).value,
+                        importe: parseFloat(fila.querySelector(`input[name^="rendiciones[${i}][importe]"]`).value),
+                        concepto_nivel_1: fila.querySelector(`select[name^="rendiciones[${i}][concepto_nivel_1]"]`).value,
+                        concepto_nivel_2: fila.querySelector(`select[name^="rendiciones[${i}][concepto_nivel_2]"]`).value,
+                        concepto_nivel_3: fila.querySelector(`select[name^="rendiciones[${i}][concepto_nivel_3]"]`).value,
+                        tipo_comprobante: fila.querySelector(`select[name^="rendiciones[${i}][tipo_requerimiento]"]`).value
+
+                    };
+
+                    rendicionesData.push(data);
+                });
+
+                fetch("{% url 'guardar_oficial' %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    },
+                    body: JSON.stringify({ rendiciones: rendicionesData, gasto_id: {{ gasto.id }} })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        Swal.fire(
+                            'Guardado!',
+                            data.message,
+                            'success'
+                        ).then(() => {
+                            window.location.href = data.redirect_url;  // Redirigir a 'rendicion'
+                        });
+                    } else {
+                        Swal.fire('Error', data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+
+            }
+        });
+    }
+});
+
+
+
+
+    // Agregar nueva fila
+    addRowButton.addEventListener('click', () => {
+      const newRow = document.createElement('tr');
+      newRow.className = "hover:bg-gray-100";
+      newRow.innerHTML = `
+        <td class="px-4 py-2"><input type="date" name="rendiciones[${indice}][fecha_operacion]" class="w-full border-gray-300 rounded" required /></td>
+        <td class="px-4 py-2">
+          <select name="rendiciones[${indice}][nombre_proveedor]" class="w-full border-gray-300 rounded select-proveedor">
+            <option value="">Seleccione</option>
+            {% for proveedor in proveedores %}
+            <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td class="px-4 py-2"><input type="text" name="rendiciones[${indice}][descripcion]" class="w-full border-gray-300 rounded" placeholder="Descripción" /></td>
+        <td class="px-4 py-2"><input type="text" name="rendiciones[${indice}][numero_requerimiento]" class="w-full border-gray-300 rounded" placeholder="N° de requerimiento" required /></td>
+            <td class="px-4 py-2">
+      <select name="rendiciones[${indice}][tipo_requerimiento]" class="w-full border-gray-300 rounded" required>
+        <option value="">Seleccione</option>
+        <option value="Factura">Factura</option>
+        <option value="Boleta">Boleta</option>
+        <option value="Nota">Nota</option>
+        <option value="Proforma">Proforma</option>
+        <option value="Declaracion">Declaración</option>
+        <option value="RHE">RHE</option>
+      </select>
+    </td>
+        <td class="px-4 py-2"><input type="number" name="rendiciones[${indice}][importe]" step="0.01" class="w-full border-gray-300 rounded importe-field" placeholder="Importe" required /></td>
+        
+        <td class="px-4 py-2">
+          <select name="rendiciones[${indice}][concepto_nivel_1]" class="w-full border-gray-300 rounded">
+            <option value="">Seleccione</option>
+            {% for concepto in conceptos_nivel_1 %}
+            <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td class="px-4 py-2">
+          <select name="rendiciones[${indice}][concepto_nivel_2]" class="w-full border-gray-300 rounded">
+            <option value="">Seleccione</option>
+            {% for concepto in conceptos_nivel_2 %}
+            <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td class="px-4 py-2">
+          <select name="rendiciones[${indice}][concepto_nivel_3]" class="w-full border-gray-300 rounded">
+            <option value="">Seleccione</option>
+            {% for concepto in conceptos_nivel_3 %}
+            <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td class="px-4 py-2 text-center">
+          <button type="button" class="bg-red-500 hover:bg-red-600 text-white font-bold px-3 py-1 rounded remove-row">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </td>
+
+      `;
+      tableBody.appendChild(newRow);
+      // Inicializar Select2 en el nuevo select de proveedores
+      $(newRow).find('.select-proveedor').select2({
+        width: '100%',
+        placeholder: 'Seleccione un proveedor'
+      });
+      indice++;
+    });
+
+
+    // Eliminar fila
+    tableBody.addEventListener('click', (e) => {
+      if (e.target.classList.contains('remove-row')) {
+        e.target.closest('tr').remove();
+        indice--;
+        actualizarImporteTotal();
+      }
+    });
+
+    // Evento para actualizar total al escribir en importe
+    tableBody.addEventListener('input', (e) => {
+      if (e.target.classList.contains('importe-field')) {
+        actualizarImporteTotal();
+      }
+    });
+
+    // Inicializar importe total
+    actualizarImporteTotal();
+});
+
+</script>
+
+{% endblock %}

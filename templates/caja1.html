@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<meta charset="UTF-8">
+<style>
+    /* Responsividad en diferentes tamaños de pantalla */
+@media (min-width: 768px) {
+  .modal-container {
+    width: 75%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .modal-container {
+    width: 66.66%;
+  }
+}
+
+</style>
+<main class="flex-1 p-8">
+  <h2 class="text-3xl font-bold mb-6">Resumen Diario</h2>
+<!-- Bloque de Modales -->
+{% for item in movimientos %}
+  {% if item.tipo == "Gasto" %}
+    <div id="modal-{{ item.id }}" class="fixed inset-0 z-50 hidden bg-gray-800 bg-opacity-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen">
+        <!-- Modal content -->
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-6xl">
+          <h2 class="text-2xl font-bold mb-4 text-center">Rendiciones de Gasto</h2>
+          <!-- Tabla responsiva -->
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm text-left text-gray-500 border border-gray-300">
+              <thead class="text-xs uppercase bg-gray-100 text-gray-700 border-b">
+                <tr>
+                  <th class="px-4 py-2 border-r">Fecha Operación</th>
+                  <th class="px-4 py-2 border-r">Proveedor</th>
+                  <th class="px-4 py-2 border-r">Descripción</th>
+                  <th class="px-4 py-2 border-r">Número de Comprobante</th>
+                  <th class="px-4 py-2 border-r">Tipo de Comprobante</th>
+                  <th class="px-4 py-2 border-r">Importe</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 1</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 2</th>
+                  <th class="px-4 py-2 border-r">Concepto Nivel 3</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for rendicion in item.rendiciones %}
+                  <tr class="bg-white hover:bg-gray-50 border-b">
+                    <td class="px-4 py-2 border-r">{{ rendicion.fecha_operacion|date:"d/m/Y" }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.apellidos_nombres_proveedor }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.descripcion }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.numero_requerimiento }}</td>
+                    <td class="px-4 py-2 border-r">{{ rendicion.tipo_comprobante }}</td>
+                    <td class="px-4 py-2 border-r text-right">{{ rendicion.importe|floatformat:2 }}</td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_1 %}
+                        {{ rendicion.concepto_nivel_1.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_2 %}
+                        {{ rendicion.concepto_nivel_2.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                    <td class="px-4 py-2 border-r">
+                      {% if rendicion.concepto_nivel_3 %}
+                        {{ rendicion.concepto_nivel_3.concepto_nombre }}
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="9" class="px-4 py-2 text-center">No hay rendiciones disponibles.</td>
+                  </tr>
+                {% endfor %}
+                {% if item.rendiciones %}
+                  <tr class="bg-gray-200 font-bold">
+                    <td colspan="5" class="px-4 py-2 text-right">Total:</td>
+                    <td class="px-4 py-2 text-right">{{ item.total_importe|floatformat:2 }}</td>
+                    <td colspan="3"></td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          <button class="mt-4 bg-blue-500 text-white px-4 py-2 rounded" onclick="closeModal('modal-{{ item.id }}')">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endfor %}
+
+
+
+
+
+
+  <!-- Tabla de Resumen Diario -->
+  <div class="bg-white shadow-md rounded-lg p-2 overflow-auto">
+    <table class="w-full text-sm text-left text-gray-500 border border-gray-300">
+      <thead class="text-xs uppercase bg-gray-100 text-gray-700 border-b">
+        <tr>
+          <th class="px-4 py-2 border-r"></th>
+          <th class="px-4 py-2 border-r">Fecha</th>
+          <th class="px-4 py-2 border-r">Metodo de Pago</th>
+          <th class="px-4 py-2 border-r">Concepto</th>
+          <th class="px-4 py-2 border-r">Notas</th>
+          <th class="px-4 py-2 border-r">Ingreso (Soles)</th>
+          <th class="px-4 py-2 border-r">Ingreso (Dolares)</th>
+          <th class="px-4 py-2 border-r">Egreso (Soles)</th>
+          <th class="px-4 py-2 border-r">Egreso (Dolares)</th>
+          <th class="px-4 py-2">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in movimientos %}
+        
+        <tr class="bg-white hover:bg-gray-50 border-b 
+            {% if item.tipo == 'Gasto' %} 
+              bg-red-100 text-red-700 
+            {% elif item.tipo == 'Rendicion' %} 
+              bg-green-100 text-green-700 
+            {% else %} 
+              bg-green-100 text-green-700 
+            {% endif %} 
+            rounded-lg">
+          <td class="px-4 py-2 border-r">
+            <span class="inline-block px-4 py-1 text-xs font-semibold uppercase rounded-full 
+                        {% if item.tipo == 'Gasto' %} 
+                          bg-red-500 text-white 
+                        {% elif item.tipo == 'Rendicion' %} 
+                          bg-green-500 text-white 
+                        {% else %} 
+                          bg-green-500 text-white 
+                        {% endif %}">
+              {% if item.tipo == 'Gasto' %} Egreso {% elif item.tipo == 'Rendicion' %} Rendicion {% else %} Ingreso {% endif %}
+            </span>
+          </td>
+          <td class="px-4 py-2 border-r">{{ item.fecha }}</td>
+          <td class="px-4 py-2 border-r">{{ item.metodo_pago }}</td>
+          <td class="px-4 py-2 border-r">{{ item.concepto }}</td>
+          <td class="px-4 py-2 border-r">{{ item.notas }}</td>
+          <td class="px-4 py-2 border-r text-right">{{ item.ingreso_soles|floatformat:2 }}</td>
+          <td class="px-4 py-2 border-r text-right">{{ item.ingreso_dolares|floatformat:2 }}</td>
+          <td class="px-4 py-2 border-r text-right">{{ item.egreso_soles|floatformat:2 }}</td>
+          <td class="px-4 py-2 border-r text-right">{{ item.egreso_dolares|floatformat:2 }}</td>
+          <td class="px-4 py-2 text-center">
+            {% if item.tipo == 'Gasto' and item.rendido %}
+            <a href="#" class="text-blue-500 hover:text-blue-700" data-modal="modal-{{ item.id }}">
+                <i class="fa-solid fa-eye"></i>
+            </a>
+            {% endif %}
+            
+            {% if item.concepto == 'Sin nombre' or item.concepto == 'Sin concepto'%}
+              <a href="{% url 'edit_item' item.id item.tipo %}" class="text-yellow-500 hover:text-yellow-700">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+              </a>
+            {% endif %}
+
+          </td>
+        </tr>
+         <!-- Modal -->
+
+        {% endfor %}
+
+        <!-- Fila de Totales -->
+        <tr class="bg-gray-100 font-bold">
+          <td colspan="5" class="px-4 py-2 border-r text-right">Totales:</td>
+          <td class="px-4 py-2 border-r text-right">{{ total_ingresos_soles|floatformat:2 }}</td>
+          <td class="px-4 py-2 border-r text-right">{{ total_ingresos_dolares|floatformat:2 }}</td>
+          <td class="px-4 py-2 border-r text-right">{{ total_egresos_soles|floatformat:2 }}</td>
+          <td class="px-4 py-2 border-r text-right">{{ total_egresos_dolares|floatformat:2 }}</td>
+          <td class="px-4 py-2"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+<!-- Resumen de Saldos -->
+<div class="mt-6 bg-gray-50 p-6 rounded-lg shadow-md">
+  <p class="text-xl font-semibold mb-4 text-gray-700">Resumen de Caja:</p>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <p class="text-sm bg-green-100 text-green-800 shadow p-3 rounded-lg border border-green-200">
+      Saldo Inicial: 
+      <span class="font-bold">S/ {{ saldo_inicial|floatformat:2 }}</span>
+    </p>
+    <p class="text-sm bg-blue-100 text-blue-800 shadow p-3 rounded-lg border border-blue-200">
+      Ingresos Totales: 
+      <span class="font-bold">S/ {{ total_ingresos_soles|floatformat:2 }}</span>
+    </p>
+    <p class="text-sm bg-red-100 text-red-800 shadow p-3 rounded-lg border border-red-200">
+      Egresos Totales: 
+      <span class="font-bold">S/ {{ total_egresos_soles|floatformat:2 }}</span>
+    </p>
+    <p class="text-sm bg-yellow-100 text-yellow-800 shadow p-3 rounded-lg border border-yellow-200">
+      Saldo Final: 
+      <span class="font-bold">S/ {{ saldo_final|floatformat:2 }}</span>
+    </p>
+  </div>
+</div>
+
+ 
+
+</main>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modalLinks = document.querySelectorAll('[data-modal]');
+        
+        modalLinks.forEach(link => {
+            link.addEventListener('click', function(event) {
+                event.preventDefault();
+                const modalId = this.getAttribute('data-modal');
+                document.getElementById(modalId).classList.remove('hidden');
+            });
+        });
+    });
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.add('hidden');
+    }
+</script>
+{% include 'mensaje.html' %}
+
+{% endblock %}

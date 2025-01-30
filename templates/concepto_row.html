@@ -1,0 +1,24 @@
+<tr>
+  <td class="border border-gray-200 px-4 py-2">
+    {{ item.concepto.concepto_nombre }}
+    {% if item.subconceptos %}
+      <ul class="ml-4">
+        {% for subitem in item.subconceptos %}
+          {% include 'concepto_row.html' with item=subitem %}
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </td>
+  <td class="border border-gray-200 px-4 py-2">Nivel {{ item.concepto.nivel }}</td>
+  <td class="border border-gray-200 px-4 py-2">
+    <button class="editBtn px-2 py-1 bg-yellow-500 text-white rounded" 
+            data-id="{{ item.concepto.id }}" 
+            data-nombre="{{ item.concepto.concepto_nombre }}" 
+            data-nivel="{{ item.concepto.nivel }}">
+      <i class="fas fa-edit"></i>
+    </button>
+    <button class="deleteBtn px-2 py-1 bg-red-500 text-white rounded" data-id="{{ item.concepto.id }}">
+      <i class="fas fa-trash"></i>
+    </button>
+  </td>
+</tr>
