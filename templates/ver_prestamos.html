@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% load static %}
+
+<!-- Cargar los archivos CSS y JS necesarios para DataTables -->
+<link href="https://cdn.datatables.net/1.13.3/css/jquery.dataTables.min.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.3/js/jquery.dataTables.min.js"></script>
+
+<!-- Cargar los estilos de Tailwind CSS para los modales -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+<div class="container mx-auto p-6">
+    <h2 class="text-2xl font-semibold mb-4">Listado de Préstamos</h2>
+    <table id="prestamos-table" class="display w-full table-auto">
+        <thead>
+            <tr>
+                <th class="px-4 py-2">Fecha Inicial</th>
+                <th class="px-4 py-2">Fecha de Vencimiento</th>
+                <th class="px-4 py-2">Número de Cuotas</th>
+                <th class="px-4 py-2">Cuota Actual</th>
+                <th class="px-4 py-2">Fecha de Pago</th>
+                <th class="px-4 py-2">Prestamo</th>
+                <th class="px-4 py-2">Monto Cuota</th>
+                <th class="px-4 py-2">Proveedor</th>
+                <th class="px-4 py-2">Acción</th> <!-- Columna de Acción -->
+            </tr>
+        </thead>
+        <tbody>
+            {% for data in prestamos_data %}
+                <tr>
+                    <td class="px-4 py-2">{{ data.fecha_inicial }}</td>
+                    <td class="px-4 py-2">{{ data.fecha_vencimiento }}</td>
+                    <td class="px-4 py-2">{{ data.numero_cuotas }}</td>
+                    <td class="px-4 py-2">{{ data.cuota_actual }}</td>
+                    <td class="px-4 py-2">{{ data.fecha_pago }}</td>
+                    <td class="px-4 py-2">{{ data.monto }}</td>
+                    <td class="px-4 py-2">{{ data.monto_cuota }}</td>
+                    <td class="px-4 py-2">{{ data.proveedor.razon_social }}</td>
+                    <td class="px-4 py-2">
+                        {% if data.estado == "proceso" %}
+                            <!-- Botón para abrir el modal de pago -->
+                            <button class="text-red-500" data-toggle="modal" data-target="#pagoModal{{ data.id }}">
+                                <i class="fas fa-sync-alt"></i> Pagar
+                            </button>
+                        {% else %}
+                            <span class="bg-green-500 text-white px-4 py-2 rounded-full">Completado</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal de pago -->
+{% for data in prestamos_data %}
+<div id="pagoModal{{ data.id }}" class="modal fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="modal-content bg-white p-6 rounded-lg shadow-lg">
+        <h2 class="text-xl mb-4">Realizar Pago para el Préstamo #{{ data.id }}</h2>
+        <form method="POST" action="{% url 'realizar_pago' %}">
+            {% csrf_token %}
+            <input type="hidden" name="prestamo_id" value="{{ data.id }}">
+
+            <div class="mb-4">
+                <label for="cuota" class="block text-sm font-medium text-gray-700">Cuota</label>
+                <input type="number" id="cuota" name="cuota" value="{{ data.cuota_actual }}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" readonly>
+            </div>
+
+            <div class="mb-4">
+                <label for="monto_pagado" class="block text-sm font-medium text-gray-700">Monto Pagado</label>
+                <input type="number" id="monto_pagado" name="monto_pagado" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
+            </div>
+
+            <div class="mb-4">
+                <label for="fecha_pago" class="block text-sm font-medium text-gray-700">Fecha de Pago</label>
+                <input type="date" id="fecha_pago" name="fecha_pago" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded-md mr-2" data-dismiss="modal">Cerrar</button>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md">Realizar Pago</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Script para controlar la visibilidad del modal -->
+<script>
+    // Mostrar el modal
+    $('[data-toggle="modal"]').click(function() {
+        var target = $(this).data('target');
+        $(target).removeClass('hidden');
+    });
+
+    // Cerrar el modal
+    $('[data-dismiss="modal"]').click(function() {
+        $(this).closest('.modal').addClass('hidden');
+    });
+</script>
+
+<!-- Script para inicializar DataTable y habilitar el buscador -->
+<script>
+    $(document).ready(function() {
+        $('#prestamos-table').DataTable({
+            "searching": true, // Habilitar la funcionalidad de búsqueda
+            "paging": true,    // Habilitar la paginación
+            "ordering": true,  // Habilitar el ordenamiento de las columnas
+            "info": true,      // Mostrar la información de la tabla (ej: "Mostrando 1 de 10 entradas")
+        });
+    });
+</script>
+<!-- Incluyendo mensajes -->
+{% include 'mensaje.html' %}
+{% endblock %}

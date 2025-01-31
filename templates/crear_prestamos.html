@@ -13,7 +13,7 @@
 
         <form method="POST" id="form-prestamo">
             {% csrf_token %}
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label for="fecha_prestamo" class="block text-sm font-medium text-gray-700">Fecha de Préstamo</label>
                     <input type="date" name="fecha_prestamo" id="fecha_prestamo" class="block w-full px-4 py-2 border rounded-md" required>
@@ -56,34 +56,41 @@
                     <label for="monto" class="block text-sm font-medium text-gray-700">Monto del Préstamo</label>
                     <input type="number" name="monto" id="monto" class="block w-full px-4 py-2 border rounded-md" required step="0.01">
                 </div>
-                <div>
-                    <label for="dia_pago" class="block text-sm font-medium text-gray-700">Día de Pago</label>
-                    <input type="number" name="dia_pago" id="dia_pago" class="block w-full px-4 py-2 border rounded-md" required min="1" max="31">
+                <!-- Local al lado del monto -->
+                    <div>
+                        <label for="local" class="block text-sm font-medium text-gray-700">Local</label>
+                        <select name="local" id="local" class="block w-full px-4 py-2 border rounded-md" required>
+                            <option value="">Seleccione un local</option>
+                            {% for local in locales %}
+                                <option value="{{ local.id }}">{{ local.nombre_local }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                <!-- Fila con 3 elementos juntos: monto y local -->
+                <div class="md:col-span-3 grid grid-cols-3 gap-4">
+                    <div>
+                        <label for="dia_pago" class="block text-sm font-medium text-gray-700">Día de Pago</label>
+                        <input type="number" name="dia_pago" id="dia_pago" class="block w-full px-4 py-2 border rounded-md" required min="1" max="31">
+                    </div>
+                    <div>
+                        <label for="estado" class="block text-sm font-medium text-gray-700">Estado</label>
+                        <select name="estado" id="estado" class="block w-full px-4 py-2 border rounded-md" required>
+                            <option value="proceso">En proceso</option>
+                            <option value="terminado">Terminado</option>
+                        </select>
+                    </div>
+                    <div id="cuota_actual_div">
+                        <label for="cuota_actual" class="block text-sm font-medium text-gray-700">Cuota Actual</label>
+                        <input type="number" name="cuota_actual" id="cuota_actual" class="block w-full px-4 py-2 border rounded-md" min="1">
+                    </div>
+                    <div>
+                    <label for="monto_cuota" class="block text-sm font-medium text-gray-700">Monto de la Cuota</label>
+                    <input type="number" name="monto_cuota" id="monto_cuota" class="block w-full px-4 py-2 border rounded-md"required>
                 </div>
-                <div>
-                    <label for="estado" class="block text-sm font-medium text-gray-700">Estado</label>
-                    <select name="estado" id="estado" class="block w-full px-4 py-2 border rounded-md" required>
-                        <option value="proceso">En proceso</option>
-                        <option value="terminado">Terminado</option>
-                    </select>
+
                 </div>
-                <div>
-                    <label for="local" class="block text-sm font-medium text-gray-700">Local</label>
-                    <select name="local" id="local" class="block w-full px-4 py-2 border rounded-md" required>
-                        <option value="">Seleccione un local</option>
-                        {% for local in locales %}
-                            <option value="{{ local.id }}">{{ local.nombre_local }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Préstamo Nuevo</label>
-                    <input type="checkbox" name="prestamo_nuevo" id="prestamo_nuevo" class="mt-2">
-                </div>
-                <div id="cuota_actual_div" style="display: none;">
-                    <label for="cuota_actual" class="block text-sm font-medium text-gray-700">Cuota Actual</label>
-                    <input type="number" name="cuota_actual" id="cuota_actual" class="block w-full px-4 py-2 border rounded-md" min="1">
-                </div>
+
+
             </div>
 
             <div class="text-center mt-5">
@@ -92,55 +99,57 @@
         </form>
     </div>
 
-    <script>
-        $(document).ready(function() {
-            $('#proveedor').select2();
-        });
+<script>
+    $(document).ready(function() {
+        $('#proveedor').select2();
+    });
 
-        $('#prestamo_nuevo').change(function() {
-            if (!this.checked) {
-                $('#cuota_actual_div').show();
-                $('#cuota_actual').prop('required', true);
-            } else {
-                $('#cuota_actual_div').hide();
-                $('#cuota_actual').prop('required', false);
-            }
-        });
+    // Mostrar/ocultar cuota_actual según el estado seleccionado
+    $('#estado').change(function() {
+        if ($(this).val() === 'proceso') {
+            $('#cuota_actual_div').show();
+            $('#cuota_actual').prop('required', true);
+        } else {
+            $('#cuota_actual_div').hide();
+            $('#cuota_actual').val(''); // Limpiar campo
+            $('#cuota_actual').prop('required', false);
+        }
+    }).trigger('change'); // Ejecutar al cargar la página para aplicar correctamente el estado inicial
 
-        function confirmarCreacion() {
-            if (!validarFormulario()) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Oops...',
-                    text: 'Por favor completa todos los campos requeridos'
-                });
-                return;
-            }
-
+    function confirmarCreacion() {
+        if (!validarFormulario()) {
             Swal.fire({
-                title: '¿Estás seguro?',
-                text: '¡Estás a punto de crear un nuevo préstamo!',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Sí, crear préstamo',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    document.getElementById('form-prestamo').submit();
-                }
+                icon: 'error',
+                title: 'Oops...',
+                text: 'Por favor completa todos los campos requeridos'
             });
+            return;
         }
 
-        function validarFormulario() {
-            let valid = true;
-            $('input[required], select[required]').each(function() {
-                if ($(this).val().trim() === '') {
-                    valid = false;
-                }
-            });
-            return valid;
-        }
-    </script>
+        Swal.fire({
+            title: '¿Estás seguro?',
+            text: '¡Estás a punto de crear un nuevo préstamo!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, crear préstamo',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('form-prestamo').submit();
+            }
+        });
+    }
+
+    function validarFormulario() {
+        let valid = true;
+        $('input[required], select[required]').each(function() {
+            if ($(this).val().trim() === '') {
+                valid = false;
+            }
+        });
+        return valid;
+    }
+</script>
 <!-- Incluyendo mensajes -->
 {% include 'mensaje.html' %}
 

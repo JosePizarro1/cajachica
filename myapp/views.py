@@ -18,12 +18,6 @@ from django.db.models import Sum
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
-from datetime import datetime
 from django.views.decorators.csrf import csrf_exempt
 import pandas as pd
 from openpyxl import Workbook
@@ -31,6 +25,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils import get_column_letter
 from django.utils.timezone import now
+from django.utils import timezone
 
 def ficha_ingreso_view(request):
     if request.method == "POST":
@@ -63,8 +58,8 @@ def ficha_ingreso_view(request):
         return redirect("ficha_ingreso")
 
     return render(request, "ficha_ingreso.html")
-    
-    
+
+
 @csrf_exempt
 def eliminar_concepto(request, id):
     if request.method == 'POST':
@@ -94,8 +89,8 @@ def crear_concepto(request):
             id_concepto_padre=id_concepto_padre,
         )
         return JsonResponse({'status': 'success'})
-        
-        
+
+
 @csrf_exempt
 def editar_concepto(request, id):
     if request.method == 'POST':
@@ -103,8 +98,8 @@ def editar_concepto(request, id):
         concepto.concepto_nombre = request.POST.get('nombre')
         concepto.save()
         return JsonResponse({'status': 'success'})
-        
-        
+
+
 def build_concepto_hierarchy(conceptos):
     """Crea una jerarquía de conceptos basada en sus niveles."""
     hierarchy = []
@@ -218,7 +213,7 @@ def generar_reporte_json(request):
         # Si ocurre un error, captura la excepción y retorna un error 500 con detalles
         return JsonResponse({'error': f'Ocurrió un error al generar el reporte: {str(e)}'}, status=500)
 
-        
+
 def guardar_proveedor(request):
     if request.method == 'POST':
         ruc_dni = request.POST.get('ruc_dni')
@@ -261,7 +256,7 @@ def guardar_cuenta_bancaria(request):
         try:
             # Obtener el proveedor al que se asociará la cuenta bancaria
             proveedor = Proveedor.objects.get(id=proveedor_id)
-            
+
             # Crear la nueva cuenta bancaria
             cuenta_bancaria = CuentaBancaria(
                 proveedor=proveedor,
@@ -271,22 +266,22 @@ def guardar_cuenta_bancaria(request):
                 cci=cci  # Guardar el CCI
             )
             cuenta_bancaria.save()
-            
+
             # Mensaje de éxito
             messages.success(request, f'La cuenta bancaria para {proveedor.razon_social} se ha guardado correctamente.')
-        
+
         except Proveedor.DoesNotExist:
             messages.error(request, 'El proveedor especificado no existe.')
         except Exception as e:
             messages.error(request, f'Error al guardar la cuenta bancaria: {e}')
-        
+
         # Redirigir a la página de proveedores o a la lista que prefieras
         return redirect('proveedores')
 
     return HttpResponse(status=405)  # Método no permitido si no es un POST
 
 
-    
+
 def editar_proveedor(request):
     if request.method == 'POST':
         proveedor_id = request.POST.get('id')
@@ -319,10 +314,10 @@ def editar_proveedor(request):
 
     return redirect('proveedores')
 
-    
+
 def logout_view(request):
     logout(request)
-    return redirect('login') 
+    return redirect('login')
 
 def registrar_rendiciones(request, gasto_id):
     gasto = get_object_or_404(Gasto, id=gasto_id)
@@ -348,9 +343,9 @@ from django.shortcuts import render
 def obtener_saldo_inicial_manual(fecha_inicio, usuario=None):
     dias_busqueda = 5  # Máximo de días para retroceder
     fecha_actual = fecha_inicio - timedelta(days=1)  # Comenzar con el día anterior al rango
-    
+
     saldo_final = Decimal(0.00)
-    
+
     for _ in range(dias_busqueda):
         # Filtrar los ingresos y gastos hasta la fecha actual
         ingresos = Ingreso.objects.filter(fecha_ingreso__lte=fecha_actual)
@@ -375,7 +370,7 @@ def obtener_saldo_inicial_manual(fecha_inicio, usuario=None):
 
     # Si no se encontró saldo en el rango permitido, retornar 0
     return Decimal(0.00)
-    
+
 def actualizar_movimiento(request):
     if request.method == 'POST':
         gasto_id = request.POST.get('id')
@@ -394,8 +389,8 @@ def actualizar_movimiento(request):
         return redirect('caja_chica')  # Cambia 'caja' por la vista a la que debe redirigir
     else:
         return JsonResponse({'error': 'Método no permitido'}, status=405)
-        
-        
+
+
 def descargar_excel(request):
     hoy = date.today().strftime('%Y-%m-%d')  # Formato para los campos de tipo date
 
@@ -409,10 +404,11 @@ def descargar_excel(request):
 
     # Calcular el saldo base según el username del usuario autenticado
     saldo_base = Decimal(0)
-    if request.user.username == 'vianca':
-        saldo_base = Decimal('2008.65')
-    elif request.user.username == 'mary':
-        saldo_base = Decimal('30047.28')
+    try:
+        saldo_inicial = SaldoInicial.objects.get(usuario=request.user)
+        saldo_base = saldo_inicial.monto_saldo_inicial
+    except SaldoInicial.DoesNotExist:
+        saldo_base = Decimal('0.00')  # Si no tiene saldo inicial, asignar 0
 
     # Calcular el saldo inicial usando la función personalizada
     saldo_inicial = obtener_saldo_inicial_manual(fecha_inicio, usuario=request.user if not request.user.is_staff else None)
@@ -422,7 +418,10 @@ def descargar_excel(request):
     # Verificar si el usuario es staff
     if request.user.is_staff:
         # Staff puede ver todos los ingresos y gastos
-        ingresos = Ingreso.objects.filter(fecha_ingreso__range=[fecha_inicio, fecha_fin])
+        ingresos = Ingreso.objects.filter(
+            fecha_ingreso__range=[fecha_inicio, fecha_fin],
+            usuario_creador=request.user  # Filtra solo los ingresos creados por el usuario staff
+        )
         gastos = Gasto.objects.filter(fecha_gasto__range=[fecha_inicio, fecha_fin])
     else:
         # No staff solo puede ver los ingresos y gastos que creó
@@ -445,7 +444,7 @@ def descargar_excel(request):
         banco_nombre = ingreso.banco.nombre if ingreso.banco else ''
         codigo_operacion = ingreso.codigo_operacion or ''
         fecha_operacion = ingreso.fecha_operacion.strftime('%d/%m/%Y') if ingreso.fecha_operacion else ''
-        
+
         movimientos.append({
             'tipo': tipo,
             'fecha': ingreso.fecha_ingreso.strftime('%-d/%-m/%Y'),
@@ -472,11 +471,11 @@ def descargar_excel(request):
                 concepto = f"REQ N°{gasto.num_requerimiento} (Id={gasto.id_requerimiento})"
             else:
                 concepto = gasto.tipo_comprobante or ''
-        
+
         banco_nombre = gasto.banco.nombre if gasto.banco else ''
         codigo_operacion = gasto.codigo_operacion or ''
         fecha_operacion = gasto.fecha_operacion.strftime('%d/%m/%Y') if gasto.fecha_operacion else ''
-        
+
         movimientos.append({
             'tipo': 'Gasto',
             'fecha': gasto.fecha_gasto.strftime('%-d/%-m/%Y'),
@@ -497,24 +496,24 @@ def descargar_excel(request):
     # Crear el archivo Excel y agregar datos
     wb = Workbook()
     ws = wb.active
-    
+
     # Escribir el título en negrita
     titulo = f"Movimientos de {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
     ws.append([titulo])
     ws.append([])  # Línea vacía
-    
+
     # Escribir el saldo inicial antes de la tabla
     ws.append([f'Saldo inicial: {saldo_inicial:,.2f}'])
     ws.append([])  # Línea vacía
 
     # Definir los encabezados
     encabezados = ['Tipo', 'Fecha', 'Método de Pago', 'Concepto', 'Proveedor', 'Banco', 'Código de Operación', 'Fecha de Operación', 'Monto', 'Notas']
-    
+
     # Escribir encabezados en la primera fila (negrita), empezando desde la columna A
     for col_num, header in enumerate(encabezados, 1):  # Comienza en la columna A
         cell = ws.cell(row=5, column=col_num, value=header)
         cell.font = Font(bold=True)
-    
+
     # Escribir los movimientos en las filas siguientes
     row_num = 6
     for movimiento in movimientos:
@@ -546,11 +545,11 @@ def descargar_excel(request):
                     pass
         adjusted_width = (max_length + 2)
         ws.column_dimensions[chr(64 + col)].width = adjusted_width
-    
+
     # Guardar el archivo
     wb.save(response)
     return response
-    
+
 @login_required
 def caja_chica(request):
     hoy = date.today().strftime('%Y-%m-%d')  # Formato para los campos de tipo date
@@ -565,19 +564,34 @@ def caja_chica(request):
 
     # Calcular el saldo base según el username del usuario autenticado
     saldo_base = Decimal(0)
-    if request.user.username == 'vianca':
-        saldo_base = Decimal('2008.65')
-    elif request.user.username == 'mary':
-        saldo_base = Decimal('30047.28')
+    try:
+        saldo_inicial = SaldoInicial.objects.get(usuario=request.user)
+        saldo_base = saldo_inicial.monto_saldo_inicial
+    except SaldoInicial.DoesNotExist:
+        saldo_base = Decimal('0.00')  # Si no tiene saldo inicial, asignar 0
 
     # Calcular el saldo inicial usando la función personalizada
     saldo_inicial = obtener_saldo_inicial_manual(fecha_inicio, usuario=request.user if not request.user.is_staff else None)
     # Sumar el saldo base al saldo inicial
     saldo_inicial += saldo_base
+
+    if not request.user.is_staff:
+        # Filtrar los ingresos y gastos del usuario autenticado sin límite de fechas
+        ingresos = Ingreso.objects.filter(usuario_creador=request.user)
+        gastos = Gasto.objects.filter(usuario_creador=request.user)
+
+        # Calcular saldo efectivo y saldo banco para el usuario no staff
+        saldo_efectivo = sum(ingreso.importe for ingreso in ingresos if ingreso.metodo_pago == 'efectivo') - sum(gasto.importe for gasto in gastos if gasto.tipo_pago == 'efectivo')
+        saldo_banco = sum(ingreso.importe for ingreso in ingresos if ingreso.metodo_pago != 'efectivo') - sum(gasto.importe for gasto in gastos if gasto.tipo_pago != 'efectivo')
+
+
     # Verificar si el usuario es staff
     if request.user.is_staff:
         # Staff puede ver todos los ingresos y gastos
-        ingresos = Ingreso.objects.filter(fecha_ingreso__range=[fecha_inicio, fecha_fin])
+        ingresos = Ingreso.objects.filter(
+            fecha_ingreso__range=[fecha_inicio, fecha_fin],
+            usuario_creador=request.user  # Filtra solo los ingresos creados por el usuario staff
+        )
         gastos = Gasto.objects.filter(fecha_gasto__range=[fecha_inicio, fecha_fin])
     else:
         # No staff solo puede ver los ingresos y gastos que creó
@@ -635,8 +649,8 @@ def caja_chica(request):
             'rendido': gasto.rendido,
             'moneda': gasto.moneda,
             'proveedor': gasto.nombre_proveedor.razon_social,
-            'rendiciones': list(gasto.rendiciones_gasto.all()), 
-            'usuario_creador': gasto.usuario_creador.username 
+            'rendiciones': list(gasto.rendiciones_gasto.all()),
+            'usuario_creador': gasto.usuario_creador.username
         })
 
     # Cálculos para los totales
@@ -658,13 +672,15 @@ def caja_chica(request):
         'fecha_inicio': fecha_inicio,
         'fecha_fin': fecha_fin,
         'rango_fechas': rango_fechas,
+        'saldo_efectivo': saldo_efectivo,
+        'saldo_banco': saldo_banco,
     }
 
     return render(request, 'caja.html', context)
 
 
-    
-    
+
+
 def cuentas_bancarias(request, proveedor_id):
     proveedor = Proveedor.objects.get(id=proveedor_id)
     cuentas = CuentaBancaria.objects.filter(proveedor_id=proveedor_id)
@@ -674,9 +690,9 @@ def cuentas_bancarias(request, proveedor_id):
         'tipo_cuenta': cuenta.get_tipo_cuenta_display(),
         'cci': cuenta.cci,
     } for cuenta in cuentas]
-    return JsonResponse({'proveedor': proveedor.razon_social, 'cuentas': cuentas_data})    
-    
-    
+    return JsonResponse({'proveedor': proveedor.razon_social, 'cuentas': cuentas_data})
+
+
 def prueba(request):
     return render(request, 'prueba.html')
 @login_required
@@ -762,7 +778,7 @@ def edit_item(request, id, tipo):
         })
     elif tipo == 'Gasto':
         gasto = get_object_or_404(Gasto, id=id)
-        
+
         # Convertir importe a cadena con punto decimal
         if gasto.importe is not None:
             gasto.importe = f"{float(gasto.importe):.2f}"
@@ -861,7 +877,7 @@ def gasto_edit(request, id):
         'locales': Local.objects.all(),
     })
 
-    
+
 from django.urls import reverse
 
 def guardar_oficial(request):
@@ -871,15 +887,15 @@ def guardar_oficial(request):
             body = json.loads(request.body)
             rendiciones = body.get('rendiciones', [])
             gasto_id = body.get('gasto_id')  # ID del gasto recibido
-            
+
             # Obtener el gasto asociado
             gasto = Gasto.objects.get(id=gasto_id)
-            
+
             # Procesar los datos recibidos
             data_guardada = []
             suma_importes_rendiciones = Decimal(0)  # Acumulador para la suma de los importes de las rendiciones
             mensaje_creacion = None  # Variable para guardar el mensaje de creación
-            
+
             for rendicion in rendiciones:
                 fecha_operacion = rendicion.get('fecha_operacion')
                 proveedor = rendicion.get('apellidos_nombres_proveedor')
@@ -908,9 +924,9 @@ def guardar_oficial(request):
                 )
                 nueva_rendicion.usuario_creador = request.user
                 nueva_rendicion.save()
-                
+
                 suma_importes_rendiciones += importe
-                
+
                 data_guardada.append({
                     "id": nueva_rendicion.id,
                     "fecha_operacion": nueva_rendicion.fecha_operacion,
@@ -921,7 +937,7 @@ def guardar_oficial(request):
                     "tipo_comprobante": nueva_rendicion.tipo_comprobante,  # Incluir en la respuesta
 
                 })
-            
+
             # Comparar la suma de los importes de las rendiciones con el importe del gasto
             if suma_importes_rendiciones > gasto.importe:
                 # Crear un nuevo gasto por la diferencia
@@ -935,14 +951,14 @@ def guardar_oficial(request):
                     nombre_proveedor=gasto.nombre_proveedor,  # Asignar el proveedor original
                     local=gasto.local,
                     tipo_pago="efectivo",
-                    
-                    
+
+
                 )
                 nuevo_gasto.usuario_creador = request.user
 
                 nuevo_gasto.save()
                 mensaje_creacion = f"Se creó un nuevo gasto con un importe de {diferencia} y moneda {gasto.moneda}."
-            
+
             elif suma_importes_rendiciones < gasto.importe:
                 # Crear un nuevo ingreso por la diferencia
                 diferencia = gasto.importe - suma_importes_rendiciones
@@ -957,11 +973,11 @@ def guardar_oficial(request):
                 nuevo_ingreso.usuario_creador=request.user
                 nuevo_ingreso.save()
                 mensaje_creacion = f"Se creó un nuevo ingreso con un importe de {diferencia} y moneda {gasto.moneda}."
-            
+
             # Actualizar el campo 'rendido' del gasto asociado
             gasto.rendido = True
             gasto.save()
-            
+
             # Responder con JSON
             response_data = {
                 'status': 'success',
@@ -999,7 +1015,7 @@ def login_view(request):
             return redirect('login')
 
     return render(request, 'login.html')
-    
+
 from django.db.models.functions import TruncMonth
 
 
@@ -1018,16 +1034,16 @@ def calcular_gastos_por_metodo_pago():
         .annotate(total_gasto=Sum('importe'))
         .order_by('-total_gasto')
     )
-    
+
     # Preparar datos para el gráfico
     etiquetas = [gasto['tipo_pago'] or 'Sin especificar' for gasto in gastos_por_metodo]
     valores = [float(gasto['total_gasto'] or 0) for gasto in gastos_por_metodo]
-    
+
     return {
         'etiquetas': etiquetas,
         'valores': valores,
     }
-    
+
 @login_required
 def dashboard_view(request):
     if request.user.is_authenticated:
@@ -1035,7 +1051,7 @@ def dashboard_view(request):
         today = date.today()
         current_year = today.year
         current_month = today.month
-        
+
         # Obtener los 5 conceptos con más gasto
         top_conceptos = (
             Gasto.objects
@@ -1053,7 +1069,7 @@ def dashboard_view(request):
         # Etiquetas y valores para el gráfico
         conceptos_labels = [entry['concepto_nombre'] for entry in top_conceptos]
         conceptos_data = [float(entry['total_gasto']) for entry in top_conceptos]
-        
+
         # Obtener ingresos por mes para el gráfico de barras (solo mes actual)
         ingresos_mes_actual = Ingreso.objects.filter(fecha_ingreso__year=current_year, fecha_ingreso__month=current_month)
         ingresos_mes_actual_total = ingresos_mes_actual.aggregate(total_ingresos=Sum('importe'))['total_ingresos'] or Decimal('0.00')
@@ -1091,7 +1107,7 @@ def dashboard_view(request):
             'gastos_por_mes_bar': gastos_por_mes_bar,
             'labels_line': labels_line,
             'ingresos_por_mes_line': ingresos_por_mes_line,
-            'gastos_por_mes_line': gastos_por_mes_line, 
+            'gastos_por_mes_line': gastos_por_mes_line,
             'conceptos_labels': conceptos_labels,
             'conceptos_data': conceptos_data,
             'datos_gastos_metodo_pago': datos_gastos_metodo_pago,
@@ -1116,7 +1132,7 @@ def agregar_banco(request):
 
         # Redirigir a la página de ingreso
         return redirect('ingreso')
-        
+
 def prestamos(request):
     if request.method == 'POST':
         try:
@@ -1131,8 +1147,8 @@ def prestamos(request):
             estado = request.POST.get('estado')
             local_id = request.POST.get('local')
             dia_pago = request.POST.get('dia_pago')  # Recibimos el día de pago
-            prestamo_nuevo = request.POST.get('prestamo_nuevo') == 'on'  # Checkbox
-            cuota_actual = request.POST.get('cuota_actual') if not prestamo_nuevo else 1
+            cuota_actual = request.POST.get('cuota_actual') if estado == "proceso" else None
+            monto_cuota = request.POST.get('monto_cuota')
 
             # Validación de datos
             if not all([fecha_prestamo, fecha_vencimiento, numero_cuotas, tea, monto, estado, local_id, dia_pago]):
@@ -1161,10 +1177,10 @@ def prestamos(request):
                 analista=analista,
                 monto=monto,
                 estado=estado,
-                prestamo_nuevo=prestamo_nuevo,
                 cuota_actual=cuota_actual,
                 local=local,
-                dia_pago=dia_pago  # Guardamos el día de pago
+                dia_pago=dia_pago,  # Guardamos el día de pago
+                monto_cuota=monto_cuota
             )
             prestamo.save()
 
@@ -1179,7 +1195,7 @@ def prestamos(request):
                 importe=monto,
                 id_fondo=fondo,
                 metodo_pago="efectivo",
-                moneda="soles",
+                moneda="Soles",
                 local=local,  # Se asigna el local
                 observacion="Prestamo"
             )
@@ -1205,8 +1221,8 @@ def prestamos(request):
     bancos = Banco.objects.all()
     locales = Local.objects.all()
     return render(request, 'crear_prestamos.html', {'proveedores': proveedores, 'bancos': bancos, 'locales': locales})
- 
-@login_required        
+
+@login_required
 def ingreso(request):
     if request.method == 'POST':
         fecha = request.POST.get('fecha')
@@ -1216,8 +1232,8 @@ def ingreso(request):
         moneda = request.POST.get('moneda')
         local_id = request.POST.get('local')
         observacion = request.POST.get('observacion')
-        codigo_operacion = request.POST.get('codigo_operacion') if metodo_pago == ['transferencia', 'yape'] else None
-        fecha_operacion  =request.POST.get('fecha_operacion') if metodo_pago in ['transferencia', 'yape'] else None
+        codigo_operacion = request.POST.get('codigo_operacion') if metodo_pago != 'efectivo' else None
+        fecha_operacion  = request.POST.get('fecha_operacion') if metodo_pago != 'efectivo' else None
         banco_id = request.POST.get('banco_operacion')  # Obtener el banco seleccionado
 
         banco = Banco.objects.get(id=banco_id) if banco_id else None
@@ -1254,7 +1270,7 @@ def ingreso(request):
     locales = Local.objects.all()
     bancos = Banco.objects.all()
     return render(request, 'ingreso.html', {'fondos': fondos, 'locales': locales,'bancos': bancos})
-    
+
 from datetime import datetime
 
 def comprobar_conceptos(tipo_comprobante, concepto_nivel_1, concepto_nivel_2, concepto_nivel_3):
@@ -1263,32 +1279,32 @@ def comprobar_conceptos(tipo_comprobante, concepto_nivel_1, concepto_nivel_2, co
         # Verifica si se proporcionó concepto_nivel_1
         if not concepto_nivel_1:
             return JsonResponse({'error': 'Debe seleccionar un concepto de nivel 1.'}, status=400)
-        
+
         # Intenta obtener el concepto de nivel 1
         try:
             concepto_1 = Concepto.objects.get(id=concepto_nivel_1)
         except Concepto.DoesNotExist:
             return JsonResponse({'error': 'El concepto de nivel 1 especificado no existe.'}, status=404)
-    
+
         # Si el nivel 1 tiene conceptos hijos, validar el nivel 2
         conceptos_nivel_2 = Concepto.objects.filter(id_concepto_padre=concepto_1)
         if conceptos_nivel_2.exists():
             # Verifica si se proporcionó concepto_nivel_2
             if not concepto_nivel_2:
                 return JsonResponse({'error': 'Debe seleccionar un concepto de nivel 2 asociado al nivel 1.'}, status=400)
-            
+
             try:
                 concepto_2 = Concepto.objects.get(id=concepto_nivel_2)
             except Concepto.DoesNotExist:
                 return JsonResponse({'error': 'El concepto de nivel 2 especificado no existe.'}, status=404)
-    
+
             # Si el nivel 2 tiene conceptos hijos, validar el nivel 3
             conceptos_nivel_3 = Concepto.objects.filter(id_concepto_padre=concepto_2)
             if conceptos_nivel_3.exists():
                 # Verifica si se proporcionó concepto_nivel_3
                 if not concepto_nivel_3:
                     return JsonResponse({'error': 'Debe seleccionar un concepto de nivel 3 asociado al nivel 2.'}, status=400)
-                
+
                 try:
                     concepto_3 = Concepto.objects.get(id=concepto_nivel_3)
                 except Concepto.DoesNotExist:
@@ -1310,7 +1326,7 @@ def comprobar_conceptos(tipo_comprobante, concepto_nivel_1, concepto_nivel_2, co
         'concepto_nivel_2': concepto_2,
         'concepto_nivel_3': concepto_3,
     }
-    
+
 @login_required
 def gasto(request):
     if request.method == 'POST':
@@ -1326,8 +1342,8 @@ def gasto(request):
             tipo_comprobante = data.get('tipo_comprobante')
             nombre_proveedor = data.get('nombre_proveedor')
             observacion = data.get('observacion')
-            codigo_operacion = data.get('codigo_operacion') if metodo_pago in ['transferencia', 'yape'] else None
-            fecha_operacion = data.get('fecha_operacion') if metodo_pago in ['transferencia', 'yape'] else None
+            codigo_operacion = data.get('codigo_operacion') if metodo_pago != 'efectivo' or tipo_comprobante == 'Deposito en cuenta' else None
+            fecha_operacion = data.get('fecha_operacion') if metodo_pago != 'efectivo' or tipo_comprobante == 'Deposito en cuenta' else None
             concepto_nivel_1 = data.get('concepto_nivel_1')
             concepto_nivel_2 = data.get('concepto_nivel_2')
             concepto_nivel_3 = data.get('concepto_nivel_3')
@@ -1337,13 +1353,22 @@ def gasto(request):
             campo_mes=data.get('campo_mes') if tipo_comprobante  in ['Boleta de pago'] else None
             id_requerimiento = data.get('id_requerimiento')  # Nuevo campo
             num_requerimiento = data.get('num_requerimiento')  # Nuevo campo
-            
+            banco_id =data.get('banco_operacion') if tipo_comprobante == 'Deposito en cuenta' else None
+            # Buscar la instancia del banco si 'banco_id' no es None
+            if banco_id:
+                try:
+                    banco = Banco.objects.get(id=banco_id)  # Buscar la instancia del banco por ID
+                except Banco.DoesNotExist:
+                    return JsonResponse({'error': 'El banco especificado no existe.'}, status=404)
+            else:
+                banco = None
+
             if fecha:
                 try:
                     fecha = datetime.strptime(fecha, '%Y-%m-%d').date()
                 except ValueError:
                     return JsonResponse({'error': 'El valor de "fecha" tiene un formato inválido. Debería estar en el formato YYYY-MM-DD.'}, status=400)
-     
+
             # Validación y conversión de fechas
 
             # Validación básica de campos obligatorios
@@ -1377,15 +1402,15 @@ def gasto(request):
 
             # Validar conceptos usando la función
             resultado_conceptos = comprobar_conceptos(tipo_comprobante, concepto_nivel_1, concepto_nivel_2, concepto_nivel_3)
-            
+
             if 'error' in resultado_conceptos:
                 return JsonResponse({'error': 'Revise los niveles de los conceptos, falta llenar algunos campos.'}, status=400)
-            
+
             # Extraer los conceptos validados
             concepto_1 = resultado_conceptos['concepto_nivel_1']
             concepto_2 = resultado_conceptos['concepto_nivel_2']
             concepto_3 = resultado_conceptos['concepto_nivel_3']
-            
+
             # Crear y guardar la instancia del gasto
             gasto = Gasto(
                 fecha_gasto=fecha,
@@ -1406,9 +1431,10 @@ def gasto(request):
                 campo_area=campo_area,
                 campo_mes=campo_mes,
                 id_requerimiento=id_requerimiento if tipo_comprobante == 'Requerimiento' else None ,
-                num_requerimiento=num_requerimiento if tipo_comprobante == 'Requerimiento' else None
-                
-                
+                num_requerimiento=num_requerimiento if tipo_comprobante == 'Requerimiento' else None,
+                banco=banco  # Asignamos la instancia del banco si existe
+
+
             )
             gasto.usuario_creador = request.user
 
@@ -1428,6 +1454,7 @@ def gasto(request):
     nivel_3_conceptos = Concepto.objects.filter(nivel=3)
     fondos = Fondo.objects.all()
     locales = Local.objects.all()
+    bancos = Banco.objects.all()
     proveedores = Proveedor.objects.all()  # Obtener todos los proveedores
     nivel_1_conceptos_json = json.dumps(list(nivel_1_conceptos.values_list('id', 'concepto_nombre')), default=str)
 
@@ -1439,23 +1466,145 @@ def gasto(request):
         'nivel_1_conceptos': nivel_1_conceptos,
         'nivel_2_conceptos': nivel_2_conceptos,
         'nivel_3_conceptos': nivel_3_conceptos,
+        'bancos':bancos
     })
 
+def ver_prestamos(request):
+    # Obtener todos los préstamos
+    prestamos = Prestamo.objects.all()
 
-    
-    
+    # Agregar la fecha de vencimiento calculada y el estado de las cuotas
+    prestamos_data = []
+
+    for prestamo in prestamos:
+        # Calcular la fecha de vencimiento y la cuota a pagar
+        fecha_vencimiento = prestamo.fecha_vencimiento
+        fecha_inicial = prestamo.fecha_prestamo  # Tomamos la fecha del préstamo como la fecha inicial
+        numero_cuotas = prestamo.numero_cuotas
+        cuota_actual = prestamo.cuota_actual
+        dia_pago = prestamo.dia_pago
+        proveedor = prestamo.proveedor  # Obtener el proveedor relacionado
+        monto=prestamo.monto
+        # Obtener la fecha actual
+        fecha_actual = timezone.now().date()
+
+        # Calcular la fecha de pago en base a la cuota actual
+        mes_pago = fecha_inicial.month + cuota_actual
+        año_pago = fecha_inicial.year
+
+        # Si el mes supera 12, ajustar el año
+        while mes_pago > 12:
+            mes_pago -= 12
+            año_pago += 1
+
+        # Crear la fecha de pago con el día de pago asignado
+        try:
+            fecha_pago = fecha_inicial.replace(year=año_pago, month=mes_pago, day=dia_pago)
+        except ValueError:
+            # Manejo si el mes no tiene el día exacto (ejemplo: 30 de febrero)
+            from calendar import monthrange
+            ultimo_dia = monthrange(año_pago, mes_pago)[1]
+            fecha_pago = fecha_inicial.replace(year=año_pago, month=mes_pago, day=ultimo_dia)
+
+        # Asegurar que la fecha de pago no sea posterior a la fecha de vencimiento
+        if fecha_pago > fecha_vencimiento:
+            fecha_pago = fecha_vencimiento
+
+        estado = prestamo.estado  # Puedes agregar lógica si el estado es "proceso" o algún otro valor
+        prestamos_data.append({
+            'id':prestamo.id,
+            'prestamo': prestamo,
+            'fecha_vencimiento': fecha_vencimiento,
+            'fecha_inicial': fecha_inicial,
+            'numero_cuotas': numero_cuotas,
+            'cuota_actual': cuota_actual,
+            'fecha_pago': fecha_pago,
+            'proveedor': proveedor,
+            'estado': estado,  # Agregar el estado aquí
+            'monto':monto,
+            'monto_cuota':prestamo.monto_cuota,
+        })
+
+    return render(request, 'ver_prestamos.html', {'prestamos_data': prestamos_data})
+
+def realizar_pago(request):
+    if request.method == 'POST':
+        prestamo_id = request.POST.get('prestamo_id', '').strip()
+        monto_pagado = request.POST.get('monto_pagado', '').strip()
+        fecha_pago = request.POST.get('fecha_pago', '').strip()
+
+        # Validación de datos
+        if not prestamo_id.isdigit():
+            messages.error(request, "❌ ID de préstamo inválido.")
+            return redirect('ver_prestamos')
+
+        if not monto_pagado:
+            messages.error(request, "❌ Debe ingresar un monto de pago.")
+            return redirect('ver_prestamos')
+
+        try:
+            monto_pagado = Decimal(monto_pagado)
+            if monto_pagado <= 0:
+                raise ValueError
+        except:
+            messages.error(request, "❌ Monto de pago no válido.")
+            return redirect('ver_prestamos')
+
+        # Obtener el préstamo
+        prestamo = get_object_or_404(Prestamo, id=int(prestamo_id))
+
+        # Datos del préstamo
+        cuota_actual = prestamo.cuota_actual
+        monto_cuota = prestamo.monto_cuota
+        numero_cuotas = prestamo.numero_cuotas
+
+        # Verificar si ya se pagaron todas las cuotas
+        if cuota_actual > numero_cuotas:
+            messages.warning(request, "⚠️ Este préstamo ya ha sido cancelado.")
+            return redirect('ver_prestamos')
+
+        # Calcular lo que se ha pagado en la cuota actual
+        total_pagado = prestamo.pagos.filter(cuota=cuota_actual).aggregate(Sum('monto_pagado'))['monto_pagado__sum'] or Decimal(0)
+
+        # Registrar el nuevo pago
+        Pago.objects.create(
+            prestamo=prestamo,
+            cuota=cuota_actual,
+            monto_pagado=monto_pagado,
+            fecha_pago=fecha_pago
+        )
+
+        total_pagado += monto_pagado  # Nuevo total de pagos en esta cuota
+
+        # Verificar si la cuota se ha completado
+        if total_pagado >= monto_cuota:
+            prestamo.cuota_actual += 1  # Avanzar a la siguiente cuota
+            if prestamo.cuota_actual > numero_cuotas:
+                prestamo.estado = "terminado"  # Marcar como terminado si se pagaron todas las cuotas
+                messages.success(request, f"✅ Pago registrado. ¡Préstamo completado! 🎉")
+            else:
+                messages.success(request, f"✅ Pago registrado. Cuota {cuota_actual} completada. Próxima cuota: {prestamo.dia_pago} del siguiente mes.")
+        else:
+            restante = monto_cuota - total_pagado
+            messages.warning(request, f"⚠️ Pago parcial registrado. Falta cancelar S/{restante:.2f} para completar la cuota {cuota_actual}.")
+
+        prestamo.save()
+        return redirect('ver_prestamos')
+
+    return HttpResponse(status=405)
+
 def get_nivel_2_conceptos(request):
     id_concepto_padre = request.GET.get('id_concepto_padre')
     conceptos_nivel_2 = Concepto.objects.filter(id_concepto_padre=id_concepto_padre)
     return JsonResponse(list(conceptos_nivel_2.values('id', 'concepto_nombre')), safe=False)
-    
+
 def get_nivel_3_conceptos(request):
     id_concepto_padre = request.GET.get('id_concepto_padre')
     conceptos_nivel_3 = Concepto.objects.filter(id_concepto_padre=id_concepto_padre)
     return JsonResponse(list(conceptos_nivel_3.values('id', 'concepto_nombre')), safe=False)
- 
-    
-    
+
+
+
 from django.shortcuts import get_object_or_404
 
 def rendicion(request):
@@ -1467,7 +1616,7 @@ def rendicion(request):
         usuarios_inactivos = User.objects.filter(is_active=False)
         # Combinar gastos del superusuario y de usuarios inactivos
         gastos_requerimientos = Gasto.objects.filter(
-            tipo_comprobante="Requerimiento", 
+            tipo_comprobante="Requerimiento",
             rendido=False
         ).filter(
             usuario_creador__in=[request.user] + list(usuarios_inactivos)
@@ -1475,22 +1624,21 @@ def rendicion(request):
     else:
         # Filtrar por usuario autenticado
         gastos_requerimientos = Gasto.objects.filter(
-            tipo_comprobante="Requerimiento", 
-            rendido=False, 
+            tipo_comprobante="Requerimiento",
+            rendido=False,
             usuario_creador=request.user
         )
 
     # Renderizar la plantilla con los gastos filtrados
     return render(request, "rendicion.html", {"today": today, "gastos": gastos_requerimientos})
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+

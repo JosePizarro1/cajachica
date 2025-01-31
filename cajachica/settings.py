@@ -9,7 +9,9 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Carpeta donde se recopila
 
 
 
-ALLOWED_HOSTS = ['caja.egatur.edu.pe','www.caja.egatur.edu.pe']
+#ALLOWED_HOSTS = ['caja.egatur.edu.pe','www.caja.egatur.edu.pe']
+
+ALLOWED_HOSTS = ['cajaegatur.pythonanywhere.com','localhost']
 
 
 STATIC_URL = '/static/'  # Esto es necesario para que los archivos estáticos sean accesibles desde la URL '/static/'

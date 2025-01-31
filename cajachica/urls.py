@@ -42,6 +42,8 @@ urlpatterns = [
     path('agregar_banco/', agregar_banco, name='agregar_banco'),
     path('descargarexcel/', descargar_excel, name='descargarexcel'),
     path('prestamos/', prestamos, name='prestamos'),
+    path('ver_prestamos/', ver_prestamos, name='ver_prestamos'),
+    path('realizar_pago/', realizar_pago, name='realizar_pago'),
 
 ]
 if settings.DEBUG:

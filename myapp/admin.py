@@ -1,13 +1,32 @@
 from django.contrib import admin
-from .models import Fondo, Local, Concepto, CajaChica, Rendicion, Gasto, Ingreso,Proveedor,CuentaBancaria,Banco
+from .models import Fondo, Local, Concepto, CajaChica, Rendicion, Gasto, Ingreso,Proveedor,CuentaBancaria,Banco,Prestamo,SaldoInicial,Pago
+
+class PagoAdmin(admin.ModelAdmin):
+    list_display = ('prestamo', 'cuota', 'monto_pagado', 'fecha_pago')
+    list_filter = ('prestamo', 'cuota', 'fecha_pago')
+    search_fields = ('prestamo__id', 'cuota')
+
+admin.site.register(Pago, PagoAdmin)
+
+@admin.register(SaldoInicial)
+class SaldoInicialAdmin(admin.ModelAdmin):
+    list_display = ('usuario', 'monto_saldo_inicial')  # Campos a mostrar en la lista
+    list_filter = ('usuario',)  # Filtro por usuario
+    search_fields = ('usuario__username',)  # BÃºsqueda por nombre de usuario
+
+@admin.register(Prestamo)
+class PrestamoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'proveedor', 'banco', 'monto', 'estado', 'cuota_actual', 'numero_cuotas', 'dia_pago', 'fecha_prestamo', 'fecha_vencimiento')
+    list_filter = ('estado', 'banco', 'proveedor', 'local')
+    search_fields = ('analista', 'proveedor__nombre', 'banco__nombre')
 
 
 @admin.register(Banco)
 class BancoAdmin(admin.ModelAdmin):
     list_display = ('id', 'nombre')  # Muestra ID y nombre en la lista
-    search_fields = ('nombre',)  # Agrega una barra de b¨²squeda por nombre
-    ordering = ('nombre',)  # Ordena alfab¨¦ticamente los bancos
-    
+    search_fields = ('nombre',)  # Agrega una barra de bÂ¨Â²squeda por nombre
+    ordering = ('nombre',)  # Ordena alfabÂ¨Â¦ticamente los bancos
+
 # Registro del modelo Fondo
 @admin.register(Fondo)
 class FondoAdmin(admin.ModelAdmin):
@@ -35,7 +54,7 @@ class CajaChicaAdmin(admin.ModelAdmin):
     search_fields = ('fecha',)
     actions = ['marcar_como_cerrado']
 
-    # AcciÃ³n personalizada para marcar como cerrado
+    # AcciÃƒÂ³n personalizada para marcar como cerrado
     def marcar_como_cerrado(self, request, queryset):
         queryset.update(cerrado=True)
     marcar_como_cerrado.short_description = 'Marcar como cerrado'
@@ -44,9 +63,9 @@ class CajaChicaAdmin(admin.ModelAdmin):
 @admin.register(Rendicion)
 class RendicionAdmin(admin.ModelAdmin):
     list_display = (
-        'numero_requerimiento', 
-        'fecha_operacion', 
-        'importe', 
+        'numero_requerimiento',
+        'fecha_operacion',
+        'importe',
         'concepto_nivel_1',
         'concepto_nivel_2',
         'concepto_nivel_3',
@@ -66,9 +85,9 @@ class IngresoAdmin(admin.ModelAdmin):
 class ProveedorAdmin(admin.ModelAdmin):
     list_display = ('id', 'ruc_dni', 'razon_social', 'nombre_comercial')
     search_fields = ('ruc_dni', 'razon_social', 'nombre_comercial')
-    list_filter = ('razon_social',)  # Agrega un filtro opcional para facilitar la b¨²squeda por raz¨®n social.
-    
-    
+    list_filter = ('razon_social',)  # Agrega un filtro opcional para facilitar la bÂ¨Â²squeda por razÂ¨Â®n social.
+
+
 # Registro del modelo CuentaBancaria
 @admin.register(CuentaBancaria)
 class CuentaBancariaAdmin(admin.ModelAdmin):

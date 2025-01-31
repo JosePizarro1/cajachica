@@ -1,30 +1,37 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+class SaldoInicial(models.Model):
+    usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name="saldo_inicial")
+    monto_saldo_inicial = models.DecimalField(max_digits=15, decimal_places=2, help_text="Saldo inicial del usuario")
+
+    def __str__(self):
+        return f"{self.usuario.username} - Saldo Inicial: {self.monto_saldo_inicial}"
+
 # Modelo para la tabla "Fondos"
 class Fondo(models.Model):
     nombre_fondo = models.CharField(max_length=255)
 
     def __str__(self):
         return self.nombre_fondo
-        
+
 
 class Banco(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return self.nombre
-                
+
 class Proveedor(models.Model):
     ruc_dni = models.CharField(max_length=13, unique=True)
     razon_social = models.CharField(max_length=255)
     nombre_comercial = models.CharField(max_length=255, null=True, blank=True)
-    telefono = models.CharField(max_length=15, null=True, blank=True)  
+    telefono = models.CharField(max_length=15, null=True, blank=True)
     nombre_contacto = models.CharField(max_length=255, null=True, blank=True)  # Nombre del contacto principal
 
     def __str__(self):
         return self.nombre_comercial or self.razon_social
-        
+
 class CuentaBancaria(models.Model):
     proveedor = models.ForeignKey(
         Proveedor,
@@ -32,7 +39,7 @@ class CuentaBancaria(models.Model):
         related_name="cuentas_bancarias"
     )
     nombre_banco = models.CharField(max_length=255)  # Nombre del banco
-    numero_cuenta = models.CharField(max_length=50, unique=True)  # Número de cuenta bancaria
+    numero_cuenta = models.CharField(max_length=50, unique=True)  # NÃºmero de cuenta bancaria
     tipo_cuenta = models.CharField(
         max_length=50,
         choices=[
@@ -42,7 +49,7 @@ class CuentaBancaria(models.Model):
         ],
         default='ahorros'
     )
-    cci = models.CharField(max_length=50, blank=True, null=True)  # Código de Cuenta Interbancaria (CCI)
+    cci = models.CharField(max_length=50, blank=True, null=True)  # CÃ³digo de Cuenta Interbancaria (CCI)
 
     def __str__(self):
         return f"{self.nombre_banco} - {self.numero_cuenta}"
@@ -63,6 +70,15 @@ class Concepto(models.Model):
 
     def __str__(self):
         return self.concepto_nombre
+
+class Pago(models.Model):
+    prestamo = models.ForeignKey('Prestamo', on_delete=models.CASCADE, related_name="pagos")
+    cuota = models.PositiveIntegerField()  # NÃºmero de la cuota (ej. 1, 2, 3...)
+    monto_pagado = models.DecimalField(max_digits=10, decimal_places=2)
+    fecha_pago = models.DateField()
+
+    def __str__(self):
+        return f"Pago {self.id} - Cuota {self.cuota} - Monto: {self.monto_pagado}"
 
 
 # Modelo para la tabla "CajaChica"
@@ -87,15 +103,14 @@ class CajaChica(models.Model):
 from datetime import date
 # Modelo para la tabla "Gastos"
 class Gasto(models.Model):
-    
     usuario_creador = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='gastos_creados'
     )
-    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
+    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta lÂ¨Âªnea agregarÂ¨Â¢ la fecha automÂ¨Â¢tica
     fecha_gasto = models.DateField(blank=True, null=True)
     concepto_nivel_1 = models.ForeignKey(Concepto, null=True, blank=True, related_name='nivel_1', on_delete=models.CASCADE)
     concepto_nivel_2 = models.ForeignKey(Concepto, null=True, blank=True, related_name='nivel_2', on_delete=models.CASCADE)
@@ -108,9 +123,9 @@ class Gasto(models.Model):
         related_name='gastos'
     )
     local = models.ForeignKey(Local, null=True, blank=True, on_delete=models.CASCADE, related_name='gastos_local')
-    
+
     tipo_comprobante = models.CharField(max_length=50, null=True, blank=True)
-    num_comprobante = models.CharField(max_length=80, null=True, blank=True)  # Campo agregado 
+    num_comprobante = models.CharField(max_length=80, null=True, blank=True)  # Campo agregado
     fecha_emision_comprobante = models.DateField(null=True, blank=True)  # Campo agregado
     numero_comprobante = models.CharField(max_length=80, null=True, blank=True)
     tipo_pago = models.CharField(max_length=50, null=True, blank=True)
@@ -157,12 +172,14 @@ class Gasto(models.Model):
         blank=True
     )
     banco = models.ForeignKey(
-        Banco, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        Banco,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='gastos_banco'
     )
+    # RelaciÃ³n con el prÃ©stamo
+    prestamo = models.ForeignKey('Prestamo', null=True, blank=True, on_delete=models.SET_NULL, related_name='gastos')
 
     def concepto_mayor_nivel(self):
         """
@@ -176,16 +193,16 @@ class Gasto(models.Model):
 
 class Rendicion(models.Model):
     usuario_creador = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='rendiciones_creadas'
     )
-    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
-    fecha_operacion = models.DateField(blank=True, null=True)  # Fecha de la operaci¨®n
-    descripcion = models.TextField(blank=True, null=True)  # Descripci¨®n
-    numero_requerimiento = models.CharField(max_length=150,blank=True, null=True)  # N¨²mero de Requerimiento
+    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta lÂ¨Âªnea agregarÂ¨Â¢ la fecha automÂ¨Â¢tica
+    fecha_operacion = models.DateField(blank=True, null=True)  # Fecha de la operaciÂ¨Â®n
+    descripcion = models.TextField(blank=True, null=True)  # DescripciÂ¨Â®n
+    numero_requerimiento = models.CharField(max_length=150,blank=True, null=True)  # NÂ¨Â²mero de Requerimiento
     importe = models.DecimalField(max_digits=10, decimal_places=2,blank=True, null=True)  # Importe
     tipo_comprobante = models.CharField(max_length=50, null=True, blank=True)
 
@@ -198,14 +215,14 @@ class Rendicion(models.Model):
     concepto_nivel_3 = models.ForeignKey(
         'Concepto', null=True, blank=True, related_name='nivel_3_rendicion', on_delete=models.CASCADE
     )
-    
+
     gasto = models.ForeignKey(
         'Gasto', null=True, blank=True, on_delete=models.SET_NULL, related_name='rendiciones_gasto'
     )
     proveedor = models.ForeignKey(
         'Proveedor', null=True, blank=True, on_delete=models.SET_NULL, related_name='rendiciones_proveedor'
     )
-    
+
     def __str__(self):
         return f"Rendicion {self.numero_requerimiento} - Importe: {self.importe}"
 class Prestamo(models.Model):
@@ -218,28 +235,28 @@ class Prestamo(models.Model):
     analista = models.CharField(max_length=100)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     estado = models.CharField(max_length=50)
-    prestamo_nuevo = models.BooleanField()
     cuota_actual = models.PositiveIntegerField()
     local = models.ForeignKey(Local, on_delete=models.CASCADE)
     dia_pago = models.PositiveIntegerField(default=1)
+    monto_cuota = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Nuevo campo
 
 
 class Ingreso(models.Model):
     usuario_creador = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='ingresos_creados'
     )
     prestamo = models.ForeignKey(
-        'Prestamo',  
-        on_delete=models.SET_NULL, 
-        null=True, 
+        'Prestamo',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='ingresos'
     )
-    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
+    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta lÂ¨Âªnea agregarÂ¨Â¢ la fecha automÂ¨Â¢tica
     fecha_ingreso = models.DateField(blank=True, null=True)
     importe = models.DecimalField(max_digits=10, decimal_places=2)
     id_fondo = models.ForeignKey(Fondo, on_delete=models.CASCADE, null=True, blank=True)  # Permitir valores nulos
@@ -253,11 +270,11 @@ class Ingreso(models.Model):
     extorno = models.BooleanField(default=False, null=True, blank=True)
     # Nuevo campo 'banco' relacionado con el modelo Banco
     banco = models.ForeignKey(
-        Banco, 
+        Banco,
         on_delete=models.SET_NULL,  # Si el banco es eliminado, no elimina el ingreso, sino que pone el campo a null
-        null=True, 
+        null=True,
         blank=True,
-        related_name='ingresos_banco'  # Nombre de relación inversa (opcional)
+        related_name='ingresos_banco'  # Nombre de relaciÃ³n inversa (opcional)
     )
 
     def __str__(self):

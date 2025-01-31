@@ -46,7 +46,7 @@
 /* Cambiar el estilo del input type="date" para que coincida */
 input[type="date"].dynamic-input {
   color-scheme: dark; /* Cambia el esquema de colores al oscuro para compatibilidad */
-}  
+}
 </style>
 <!-- Incluir Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -89,12 +89,13 @@ input[type="date"].dynamic-input {
       <div>
         <label for="metodo_pago" class="block text-sm font-medium text-gray-700">Método de Pago:</label>
         <select id="metodo_pago" name="metodo_pago" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
-                    <option value="efectivo">Efectivo</option>
-
+            <option value="efectivo">Efectivo</option>
           <option value="yape">Yape</option>
-        <option value="efectivo">Giro</option>
-
+            <option value="Deposito en cuenta">Deposito en Cuenta</option>
+          <option value="IZIPAY">IZIPAY</option>
+          <option value="IZIPAY YA">IZIPAY YA</option>
           <option value="transferencia">Transferencia</option>
+
         </select>
       </div>
 
@@ -120,7 +121,7 @@ input[type="date"].dynamic-input {
     <!-- Banco (dinámico) -->
     <div id="banco-container" class="dynamic-section" style="display: none;">
       <label for="banco_operacion" class="dynamic-label">Banco :</label>
-      
+
       <!-- Select de Banco -->
       <select id="banco_operacion" name="banco_operacion" class="dynamic-input">
         <option value="" disabled selected>Seleccionar Banco</option>
@@ -128,17 +129,17 @@ input[type="date"].dynamic-input {
           <option value="{{ banco.id }}">{{ banco.nombre }}</option>
         {% endfor %}
       </select>
-    
+
     </div>
 
 
-    
+
     <!-- Código de Operacion (dinámico) -->
     <div id="codigo-operacion-container" class="dynamic-section" style="display: none;">
       <label for="codigo_operacion" class="dynamic-label">Código de Operación:</label>
       <input type="text" id="codigo_operacion" name="codigo_operacion" class="dynamic-input" placeholder="Código de operación">
     </div>
-    
+
     <!-- Fecha de Operacion (dinámico) -->
     <div id="fecha-operacion-container" class="dynamic-section" style="display: none;">
       <label for="fecha_operacion" class="dynamic-label">Fecha de Operación:</label>
@@ -203,16 +204,16 @@ input[type="date"].dynamic-input {
     const fechaOperacionContainer = document.getElementById('fecha-operacion-container');
     const bancoContainer = document.getElementById('banco-container');
 
-    
+
     const btnGuardar = document.getElementById('btn-guardar');
     const formulario = document.getElementById('formulario-ingreso');
 
     // Mostrar/Ocultar campo Código de Operacion
     metodoPagoSelect.addEventListener('change', () => {
-      if (metodoPagoSelect.value === 'transferencia' || metodoPagoSelect.value === 'yape' ) {
+      if (metodoPagoSelect.value !== 'efectivo') {
         codigoOperacionContainer.style.display = 'block';
         fechaOperacionContainer.style.display = 'block';
-         bancoContainer.style.display='block';       
+         bancoContainer.style.display='block';
       } else {
         codigoOperacionContainer.style.display = 'none';
         fechaOperacionContainer.style.display = 'none';
