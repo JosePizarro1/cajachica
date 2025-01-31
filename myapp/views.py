@@ -574,7 +574,8 @@ def caja_chica(request):
     saldo_inicial = obtener_saldo_inicial_manual(fecha_inicio, usuario=request.user if not request.user.is_staff else None)
     # Sumar el saldo base al saldo inicial
     saldo_inicial += saldo_base
-
+    saldo_efectivo = 0
+    saldo_banco = 0
     if not request.user.is_staff:
         # Filtrar los ingresos y gastos del usuario autenticado sin límite de fechas
         ingresos = Ingreso.objects.filter(usuario_creador=request.user)
