@@ -3,84 +3,89 @@
 {% block content %}
 {% load static %}
 
-<!-- Cargar los archivos CSS y JS necesarios para DataTables -->
-<link href="https://cdn.datatables.net/1.13.3/css/jquery.dataTables.min.css" rel="stylesheet">
+<!-- Cargar Tailwind CSS -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+<!-- Cargar DataTables -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.3/css/dataTables.tailwindcss.min.css">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.3/js/jquery.dataTables.min.js"></script>
 
-<!-- Cargar los estilos de Tailwind CSS para los modales -->
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
-<div class="container mx-auto p-6">
-    <h2 class="text-2xl font-semibold mb-4">Listado de Préstamos</h2>
-    <table id="prestamos-table" class="display w-full table-auto">
-        <thead>
-            <tr>
-                <th class="px-4 py-2">Fecha Inicial</th>
-                <th class="px-4 py-2">Fecha de Vencimiento</th>
-                <th class="px-4 py-2">Número de Cuotas</th>
-                <th class="px-4 py-2">Cuota Actual</th>
-                <th class="px-4 py-2">Fecha de Pago</th>
-                <th class="px-4 py-2">Prestamo</th>
-                <th class="px-4 py-2">Monto Cuota</th>
-                <th class="px-4 py-2">Proveedor</th>
-                <th class="px-4 py-2">Acción</th> <!-- Columna de Acción -->
-            </tr>
-        </thead>
-        <tbody>
-            {% for data in prestamos_data %}
-                <tr>
-                    <td class="px-4 py-2">{{ data.fecha_inicial }}</td>
-                    <td class="px-4 py-2">{{ data.fecha_vencimiento }}</td>
-                    <td class="px-4 py-2">{{ data.numero_cuotas }}</td>
-                    <td class="px-4 py-2">{{ data.cuota_actual }}</td>
-                    <td class="px-4 py-2">{{ data.fecha_pago }}</td>
-                    <td class="px-4 py-2">{{ data.monto }}</td>
-                    <td class="px-4 py-2">{{ data.monto_cuota }}</td>
-                    <td class="px-4 py-2">{{ data.proveedor.razon_social }}</td>
-                    <td class="px-4 py-2">
-                        {% if data.estado == "proceso" %}
-                            <!-- Botón para abrir el modal de pago -->
-                            <button class="text-red-500" data-toggle="modal" data-target="#pagoModal{{ data.id }}">
-                                <i class="fas fa-sync-alt"></i> Pagar
-                            </button>
-                        {% else %}
-                            <span class="bg-green-500 text-white px-4 py-2 rounded-full">Completado</span>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="bg-white shadow-lg rounded-lg p-6">
+        <h2 class="text-3xl font-bold text-gray-700 mb-6 text-center">Listado de Préstamos</h2>
+        
+        <div class="overflow-x-auto">
+            <table id="prestamos-table" class="w-full border border-gray-200 rounded-lg">
+                <thead class="bg-blue-600 text-white uppercase text-sm">
+                    <tr>
+                        <th class="py-3 px-4 text-left">Fecha Inicial</th>
+                        <th class="py-3 px-4 text-left">Fecha de Vencimiento</th>
+                        <th class="py-3 px-4 text-left">Número de Cuotas</th>
+                        <th class="py-3 px-4 text-left">Cuota Actual</th>
+                        <th class="py-3 px-4 text-left">Fecha de Pago</th>
+                        <th class="py-3 px-4 text-left">Préstamo</th>
+                        <th class="py-3 px-4 text-left">Monto Cuota</th>
+                        <th class="py-3 px-4 text-left">Proveedor</th>
+                        <th class="py-3 px-4 text-center">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-700">
+                    {% for data in prestamos_data %}
+                    <tr class="border-b hover:bg-gray-100 transition">
+                        <td class="py-3 px-4">{{ data.fecha_inicial }}</td>
+                        <td class="py-3 px-4">{{ data.fecha_vencimiento }}</td>
+                        <td class="py-3 px-4">{{ data.numero_cuotas }}</td>
+                        <td class="py-3 px-4">{{ data.cuota_actual }}</td>
+                        <td class="py-3 px-4">{{ data.fecha_pago }}</td>
+                        <td class="py-3 px-4">{{ data.monto }}</td>
+                        <td class="py-3 px-4">{{ data.monto_cuota }}</td>
+                        <td class="py-3 px-4">{{ data.proveedor.razon_social }}</td>
+                        <td class="py-3 px-4 text-center">
+                            {% if data.estado == "proceso" %}
+                                <button class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-700 transition open-modal"
+                                    data-target="#pagoModal{{ data.id }}">
+                                    <i class="fas fa-sync-alt"></i> Pagar
+                                </button>
+                            {% else %}
+                                <span class="bg-green-500 text-white px-4 py-2 rounded-full">Completado</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <!-- Modal de pago -->
 {% for data in prestamos_data %}
-<div id="pagoModal{{ data.id }}" class="modal fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
-    <div class="modal-content bg-white p-6 rounded-lg shadow-lg">
-        <h2 class="text-xl mb-4">Realizar Pago para el Préstamo #{{ data.id }}</h2>
+<div id="pagoModal{{ data.id }}" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-xl font-bold mb-4 text-gray-700">Realizar Pago para el Préstamo #{{ data.id }}</h2>
         <form method="POST" action="{% url 'realizar_pago' %}">
             {% csrf_token %}
             <input type="hidden" name="prestamo_id" value="{{ data.id }}">
 
             <div class="mb-4">
-                <label for="cuota" class="block text-sm font-medium text-gray-700">Cuota</label>
-                <input type="number" id="cuota" name="cuota" value="{{ data.cuota_actual }}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" readonly>
+                <label class="block text-sm font-medium text-gray-700">Cuota</label>
+                <input type="number" value="{{ data.cuota_actual }}" class="mt-1 block w-full p-2 border border-gray-300 rounded-md bg-gray-100" readonly>
             </div>
 
             <div class="mb-4">
-                <label for="monto_pagado" class="block text-sm font-medium text-gray-700">Monto Pagado</label>
-                <input type="number" id="monto_pagado" name="monto_pagado" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
+                <label class="block text-sm font-medium text-gray-700">Monto Pagado</label>
+                <input type="number" name="monto_pagado" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
             </div>
 
             <div class="mb-4">
-                <label for="fecha_pago" class="block text-sm font-medium text-gray-700">Fecha de Pago</label>
-                <input type="date" id="fecha_pago" name="fecha_pago" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
+                <label class="block text-sm font-medium text-gray-700">Fecha de Pago</label>
+                <input type="date" name="fecha_pago" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
             </div>
 
             <div class="flex justify-end">
-                <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded-md mr-2" data-dismiss="modal">Cerrar</button>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md">Realizar Pago</button>
+                <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded-md mr-2 close-modal">Cerrar</button>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-700">Realizar Pago</button>
             </div>
         </form>
     </div>
@@ -89,29 +94,43 @@
 
 <!-- Script para controlar la visibilidad del modal -->
 <script>
-    // Mostrar el modal
-    $('[data-toggle="modal"]').click(function() {
-        var target = $(this).data('target');
-        $(target).removeClass('hidden');
+    document.querySelectorAll('.open-modal').forEach(button => {
+        button.addEventListener('click', function () {
+            document.querySelector(this.dataset.target).classList.remove('hidden');
+        });
     });
 
-    // Cerrar el modal
-    $('[data-dismiss="modal"]').click(function() {
-        $(this).closest('.modal').addClass('hidden');
-    });
-</script>
-
-<!-- Script para inicializar DataTable y habilitar el buscador -->
-<script>
-    $(document).ready(function() {
-        $('#prestamos-table').DataTable({
-            "searching": true, // Habilitar la funcionalidad de búsqueda
-            "paging": true,    // Habilitar la paginación
-            "ordering": true,  // Habilitar el ordenamiento de las columnas
-            "info": true,      // Mostrar la información de la tabla (ej: "Mostrando 1 de 10 entradas")
+    document.querySelectorAll('.close-modal').forEach(button => {
+        button.addEventListener('click', function () {
+            this.closest('.fixed').classList.add('hidden');
         });
     });
 </script>
+
+<!-- Inicializar DataTable -->
+<script>
+    $(document).ready(function() {
+        $('#prestamos-table').DataTable({
+            "language": {
+                "lengthMenu": "Mostrar _MENU_ registros por página",
+                "zeroRecords": "No se encontraron resultados",
+                "info": "Mostrando página _PAGE_ de _PAGES_",
+                "infoEmpty": "No hay registros disponibles",
+                "infoFiltered": "(filtrado de _MAX_ registros en total)",
+                "search": "Buscar:",
+                "paginate": {
+                    "first": "Primero",
+                    "last": "Último",
+                    "next": "Siguiente",
+                    "previous": "Anterior"
+                }
+            },
+            "pageLength": 10,
+            "ordering": true
+        });
+    });
+</script>
+
 <!-- Incluyendo mensajes -->
 {% include 'mensaje.html' %}
 {% endblock %}

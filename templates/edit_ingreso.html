@@ -2,127 +2,137 @@
 
 {% block content %}
 <style>
-  .dynamic-section {
-    background-color: #343a40;
-    color: #fff;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
-  }
-  .dynamic-label {
-    display: block;
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 5px;
-  }
-  .dynamic-input {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ced4da;
-    border-radius: 5px;
-    font-size: 14px;
-    background-color: #495057;
-    color: #fff;
-  }
-  .dynamic-input::placeholder {
-    color: #adb5bd;
-  }
-  .dynamic-input:focus {
-    outline: none;
-    border-color: #17a2b8;
-    box-shadow: 0 0 4px rgba(23, 162, 184, 0.5);
-  }
-  input[type="date"].dynamic-input {
-    color-scheme: dark;
-  }
+  /* Fondo oscuro con bordes redondeados y sombra */
+.dynamic-section {
+  background-color: #343a40; /* Fondo oscuro */
+  color: #fff; /* Texto blanco */
+  padding: 15px; /* Espaciado interno */
+  border-radius: 8px; /* Bordes redondeados */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Sombra ligera */
+  margin-bottom: 20px; /* Espaciado inferior */
+}
+
+/* Estilo de las etiquetas */
+.dynamic-label {
+  display: block; /* Ocupa toda la fila */
+  font-size: 14px; /* Tamaño del texto */
+  font-weight: 500; /* Peso intermedio */
+  margin-bottom: 5px; /* Espaciado inferior */
+}
+
+/* Estilo de los inputs */
+.dynamic-input {
+  width: 100%; /* Ancho completo */
+  padding: 10px; /* Espaciado interno */
+  border: 1px solid #ced4da; /* Borde gris claro */
+  border-radius: 5px; /* Bordes redondeados */
+  font-size: 14px; /* Tamaño del texto */
+  background-color: #495057; /* Fondo oscuro del input */
+  color: #fff; /* Texto blanco */
+}
+
+/* Placeholder en color gris claro */
+.dynamic-input::placeholder {
+  color: #adb5bd; /* Gris claro */
+}
+
+/* Input en estado de enfoque */
+.dynamic-input:focus {
+  outline: none; /* Eliminar borde por defecto */
+  border-color: #17a2b8; /* Color del borde al enfocar */
+  box-shadow: 0 0 4px rgba(23, 162, 184, 0.5); /* Sombra al enfocar */
+}
+
+/* Cambiar el estilo del input type="date" para que coincida */
+input[type="date"].dynamic-input {
+  color-scheme: dark; /* Cambia el esquema de colores al oscuro para compatibilidad */
+}
 </style>
 
 <main class="flex-1 p-8">
   <h2 class="text-3xl font-bold mb-6">Editar Ingreso #{{ ingreso.id }}</h2>
 
   <div class="bg-white shadow-md rounded-lg p-6">
-    <form method="POST" action="{% url 'editar_ingreso' ingreso.id %}" id="formulario-ingreso" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <form id="formulario-ingreso" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {% csrf_token %}
+
+      <input type="hidden" id="ingreso_id" value="{{ ingreso.id }}">
 
       <!-- Fecha -->
       <div>
         <label for="fecha" class="block text-sm font-medium text-gray-700">Fecha:</label>
-        <input 
-          type="text" 
-          id="fecha" 
-          name="fecha" 
-          value="{{ ingreso.fecha_ingreso|date:'d/m/Y' }}" 
-          class="dynamic-input bg-gray-100 text-gray-500 cursor-not-allowed" 
-          readonly 
-        >
+        <input type="text" id="fecha" value="{{ ingreso.fecha_ingreso|date:'d/m/Y' }}" class="dynamic-input bg-gray-100 text-gray-500 cursor-not-allowed" readonly>
       </div>
 
       <!-- Importe -->
       <div>
         <label for="importe" class="block text-sm font-medium text-gray-700">Importe:</label>
-        <input 
-          type="number" 
-          id="importe" 
-          name="importe" 
-          step="0.01" 
-          value="{{ ingreso.importe }}" 
-          class="dynamic-input bg-gray-100 text-gray-500 cursor-not-allowed" 
-          readonly
-        >
+        <input type="number" id="importe" value="{{ ingreso.importe }}" class="dynamic-input bg-gray-100 text-gray-500 cursor-not-allowed" readonly>
       </div>
 
       <!-- Fondo -->
       <div>
         <label for="id_fondo" class="block text-sm font-medium text-gray-700">Fondo:</label>
-        <select id="id_fondo" name="id_fondo" class="dynamic-input" required>
+        <select id="id_fondo" class="dynamic-input">
           {% for fondo in fondos %}
-          <option value="{{ fondo.id }}" {% if fondo.id == ingreso.id_fondo.id %}selected{% endif %}>{{ fondo.nombre_fondo }}</option>
+          <option value="{{ fondo.id }}">{{ fondo.nombre_fondo }}</option>
           {% endfor %}
         </select>
       </div>
 
-      <!-- Metodo de Pago -->
+      <!-- Método de Pago -->
       <div>
-        <label for="metodo_pago" class="block text-sm font-medium text-gray-700">Metodo de Pago:</label>
-        <select id="metodo_pago" name="metodo_pago" class="dynamic-input">
-          <option value="efectivo" {% if ingreso.metodo_pago == "efectivo" %}selected{% endif %}>Efectivo</option>
-          <option value="yape" {% if ingreso.metodo_pago == "yape" %}selected{% endif %}>Yape</option>
-          <option value="transferencia" {% if ingreso.metodo_pago == "transferencia" %}selected{% endif %}>Transferencia</option>
-          <option value="giro" {% if ingreso.metodo_pago == "giro" %}selected{% endif %}>Giro</option>
+        <label for="metodo_pago" class="block text-sm font-medium text-gray-700">Método de Pago:</label>
+        <select id="metodo_pago" class="dynamic-input">
+          <option value="efectivo">Efectivo</option>
+          <option value="yape">Yape</option>
+          <option value="Deposito en cuenta">Deposito en Cuenta</option>
+          <option value="IZIPAY">IZIPAY</option>
+          <option value="IZIPAY YA">IZIPAY YA</option>
+          <option value="transferencia">Transferencia</option>
         </select>
       </div>
 
-      <!-- Codigo de Operacion -->
-      <div id="codigo-operacion-container" style="display: none;">
-        <label for="codigo_operacion" class="block text-sm font-medium text-gray-700">Código de Operación:</label>
-        <input 
-          type="text" 
-          id="codigo_operacion" 
-          name="codigo_operacion" 
-          class="dynamic-input" 
-          placeholder="Ingrese el código de operación"
-        >
+      <!-- Código de Operación -->
+      <div id="codigo-operacion-container" class="dynamic-section" style="display: none;">
+        <label for="codigo_operacion" class="dynamic-label">Código de Operación:</label>
+        <input type="text" id="codigo_operacion" class="dynamic-input" placeholder="Código de operación">
       </div>
 
-      <!-- Fecha de Operacion -->
-      <div id="fecha-operacion-container" style="display: none;">
-        <label for="fecha_operacion" class="block text-sm font-medium text-gray-700">Fecha de Operación:</label>
-        <input 
-          type="date" 
-          id="fecha_operacion" 
-          name="fecha_operacion" 
-          class="dynamic-input"
-        >
+      <!-- Fecha de Operación -->
+      <div id="fecha-operacion-container" class="dynamic-section" style="display: none;">
+        <label for="fecha_operacion" class="dynamic-label">Fecha de Operación:</label>
+        <input type="date" id="fecha_operacion" class="dynamic-input">
       </div>
 
-      <!-- Observacion -->
+      <!-- Banco -->
+      <div id="banco-container" class="dynamic-section" style="display: none;">
+        <label for="banco_operacion" class="dynamic-label">Banco:</label>
+        <select id="banco_operacion" class="dynamic-input">
+          <option value="" disabled selected>Seleccionar Banco</option>
+          {% for banco in bancos %}
+          <option value="{{ banco.id }}">{{ banco.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Local -->
+      <div>
+        <label for="local" class="block text-sm font-medium text-gray-700">Local:</label>
+        <select id="local" class="dynamic-input">
+          {% for loc in locales %}
+          <option value="{{ loc.id }}">{{ loc.nombre_local }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Observación -->
       <div class="col-span-1 md:col-span-2 lg:col-span-3">
-        <label for="observacion" class="block text-sm font-medium text-gray-700">Observacion:</label>
-        <textarea id="observacion" name="observacion" rows="3" class="dynamic-input">{{ ingreso.observacion }}</textarea>
+        <label for="observacion" class="block text-sm font-medium text-gray-700">Observación:</label>
+        <textarea id="observacion" rows="3" placeholder="Escribe aquí..." class="dynamic-input"></textarea>
       </div>
 
-      <!-- Botones -->
+      <!-- Botón Guardar -->
       <div class="col-span-1 md:col-span-2 lg:col-span-3 text-right">
         <a href="{% url 'caja_chica' %}" class="bg-gray-500 text-white px-4 py-2 rounded">Cancelar</a>
         <button id="btn-guardar" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700">
@@ -139,39 +149,64 @@
     const metodoPagoSelect = document.getElementById('metodo_pago');
     const codigoOperacionContainer = document.getElementById('codigo-operacion-container');
     const fechaOperacionContainer = document.getElementById('fecha-operacion-container');
+    const bancoContainer = document.getElementById('banco-container');
     const btnGuardar = document.getElementById('btn-guardar');
-    const formulario = document.getElementById('formulario-ingreso');
 
     metodoPagoSelect.addEventListener('change', () => {
-      if (metodoPagoSelect.value === 'transferencia' || metodoPagoSelect.value === 'yape') {
+      if (metodoPagoSelect.value !== 'efectivo') {
         codigoOperacionContainer.style.display = 'block';
         fechaOperacionContainer.style.display = 'block';
+        bancoContainer.style.display = 'block';
       } else {
         codigoOperacionContainer.style.display = 'none';
         fechaOperacionContainer.style.display = 'none';
+        bancoContainer.style.display = 'none';
       }
     });
 
-    metodoPagoSelect.dispatchEvent(new Event('change'));
-
-    btnGuardar.addEventListener('click', (e) => {
+    btnGuardar.addEventListener('click', async (e) => {
       e.preventDefault();
+      const ingresoId = document.getElementById('ingreso_id').value;
+
+      const data = {
+        id_fondo: document.getElementById('id_fondo').value,
+        metodo_pago: metodoPagoSelect.value,
+        local: document.getElementById('local').value,
+        codigo_operacion: document.getElementById('codigo_operacion').value,
+        fecha_operacion: document.getElementById('fecha_operacion').value,
+        banco_operacion: document.getElementById('banco_operacion').value,
+        observacion: document.getElementById('observacion').value
+      };
+
       Swal.fire({
-        title: "¿Estas seguro?",
-        text: "Estas a punto de guardar los cambios en este ingreso.",
+        title: "¿Estás seguro?",
+        text: "Se actualizará el ingreso.",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonText: "Si, guardar",
-        cancelButtonText: "Cancelar",
-        reverseButtons: true
-      }).then((result) => {
+        confirmButtonText: "Sí, guardar",
+        cancelButtonText: "Cancelar"
+      }).then(async (result) => {
         if (result.isConfirmed) {
-          formulario.submit();
+          const response = await fetch(`/editar_ingreso/${ingresoId}/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": "{{ csrf_token }}"
+            },
+            body: JSON.stringify(data)
+          });
+
+          const result = await response.json();
+          if (response.ok) {
+            Swal.fire("Guardado", result.message, "success").then(() => {
+              window.location.href = "{% url 'caja_chica' %}";
+            });
+          } else {
+            Swal.fire("Error", result.message, "error");
+          }
         }
       });
     });
   });
 </script>
-{% include 'mensaje.html' %}
-
 {% endblock %}

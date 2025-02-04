@@ -96,16 +96,20 @@
           Conceptos
         </a>
         <!-- Préstamos (solo si el usuario es staff) -->
-{% if user.is_staff %}
-  <a href="{% url 'prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-    <i class="fas fa-hand-holding-usd mr-2"></i>
-    Préstamos
-  </a>
-   <a href="{% url 'ver_prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-    <i class="fas fa-list mr-2"></i>
-    Ver Préstamos
-  </a>
-{% endif %}
+        {% if user.is_staff %}
+          <a href="{% url 'prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+            <i class="fas fa-hand-holding-usd mr-2"></i>
+            Préstamos
+          </a>
+          <a href="{% url 'ver_prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+            <i class="fas fa-list mr-2"></i>
+            Ver Préstamos
+          </a>
+          <a href="{% url 'ver_personal' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+            <i class="fas fa-users mr-2"></i>
+            Ver Personal
+          </a>
+        {% endif %}
 
       </nav>
     </aside>

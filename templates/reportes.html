@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% load static %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
@@ -44,10 +45,10 @@
                     Fecha Inicio:
                 </label>
                 <div class="relative">
-                    <input 
-                        type="date" 
-                        id="fecha_inicio" 
-                        name="fecha_inicio" 
+                    <input
+                        type="date"
+                        id="fecha_inicio"
+                        name="fecha_inicio"
                         class="w-full border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" />
                 </div>
             </div>
@@ -58,10 +59,10 @@
                     Fecha Final:
                 </label>
                 <div class="relative">
-                    <input 
-                        type="date" 
-                        id="fecha_final" 
-                        name="fecha_final" 
+                    <input
+                        type="date"
+                        id="fecha_final"
+                        name="fecha_final"
                         class="w-full border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500" />
                 </div>
             </div>
@@ -69,22 +70,26 @@
 
         <!-- Botón para generar el reporte -->
         <div class="flex justify-center mt-4">
-            <button 
-                type="submit" 
-                id="btnGenerarPDF" 
+            <button
+                type="submit"
+                id="btnGenerarPDF"
                 class="px-6 py-3 bg-red-600 text-white font-medium rounded-md shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-300">
                 Generar PDF
             </button>
+               <!-- Reporte Anual (Excel) -->
+            <a id="reporteAnual"
+                href="{% url 'reporte_anual' %}"
+                class="px-6 py-3 bg-green-600 text-white font-medium rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-300">
+                Reporte Anual
+            </a>
+
         </div>
     </form>
 </div>
 
-
-<!-- Carga de FontAwesome para íconos (opcional, si no se usa ya) -->
-<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
-
-
+<script src="{% static 'js/reporteexcel.js' %}" ></script>
 <script>
+
 $(document).ready(function() {
     $('#concepto_nivel_2').select2();
     $('#concepto_nivel_1').select2();
@@ -209,5 +214,52 @@ function generarPDF(data) {
     doc.save("reporte_gastos.pdf");
 }
 
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const linkReporteAnual = document.getElementById("reporteAnual");
+
+        linkReporteAnual.addEventListener("click", function (event) {
+            event.preventDefault(); // Evita la navegación inmediata
+
+            Swal.fire({
+                title: 'Generando Reporte...',
+                text: 'Esto puede tardar unos segundos.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Forzar la descarga del archivo Excel
+            fetch("{% url 'reporte_anual' %}")
+                .then(response => {
+                    Swal.close(); // Cierra la alerta cuando se complete la generación
+                    if (!response.ok) {
+                        throw new Error("Error al generar el reporte.");
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "reporte_anual.xlsx"; // Nombre del archivo
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                })
+                .catch(error => {
+                    Swal.fire({
+                        title: "Error",
+                        text: "Hubo un problema al generar el reporte.",
+                        icon: "error",
+                        confirmButtonText: "Aceptar"
+                    });
+                });
+        });
+    });
 </script>
+
+
+
 {% endblock %}

@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% load static %}
+
+<!-- Cargar Tailwind CSS -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+<!-- Cargar DataTables -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.3/css/dataTables.tailwindcss.min.css">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.3/js/jquery.dataTables.min.js"></script>
+
+<div class="max-w-6xl mx-auto px-4 py-6">
+    <div class="bg-white shadow-lg rounded-lg p-6">
+        <h2 class="text-3xl font-bold text-gray-700 mb-6 text-center">Listado de Personal</h2>
+        
+        <div class="overflow-x-auto">
+            <table id="personalTable" class="w-full border border-gray-200 rounded-lg">
+                <thead class="bg-blue-600 text-white uppercase text-sm">
+                    <tr>
+                        <th class="py-3 px-4 text-left">N° DNI</th>
+                        <th class="py-3 px-4 text-left">Apellidos y Nombres</th>
+                        <th class="py-3 px-4 text-left">Correo Personal</th>
+                        <th class="py-3 px-4 text-left">Celular</th>
+                        <th class="py-3 px-4 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-700">
+                    {% for persona in personal %}
+                    <tr class="border-b hover:bg-gray-100 transition">
+                        <td class="py-3 px-4">{{ persona.dni }}</td>
+                        <td class="py-3 px-4">{{ persona.apellidos_nombres }}</td>
+                        <td class="py-3 px-4">{{ persona.correo_personal }}</td>
+                        <td class="py-3 px-4">{{ persona.celular }}</td>
+                        <td class="py-3 px-4 text-center">
+                            <!-- Botón de Editar -->
+                            <a href="{% url 'editar_personal' persona.id %}" 
+                               class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-yellow-700 transition">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            
+                            <!-- Botón de Crear Contraseña o Estado -->
+                            {% if persona.contraseña_creada %}
+                                <span class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm">
+                                    <i class="fas fa-lock"></i> Ya Creado
+                                </span>
+                            {% else %}
+                                <button onclick="crearContraseña({{ persona.id }})" 
+                                        class="bg-green-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-700 transition">
+                                    <i class="fas fa-key"></i> Crear Contraseña
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<!-- Inicializar DataTables -->
+<script>
+    $(document).ready(function() {
+        $('#personalTable').DataTable({
+            "searching": true, // Habilitar la funcionalidad de búsqueda
+            "paging": true,    // Habilitar la paginación
+            "ordering": true,  // Habilitar el ordenamiento de las columnas
+            "info": true, 
+        });
+    });
+       function crearContraseña(personalId) {
+        Swal.fire({
+            title: "¿Está seguro?",
+            text: "¿Desea generar una nueva contraseña para este usuario?",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#3085d6",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Sí, crear contraseña"
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Aquí puedes redirigir a una vista que genere la contraseña
+                window.location.href = `/crear_contraseña/${personalId}/`;
+            }
+        });
+    }
+</script>
+<!-- Incluyendo mensajes -->
+{% include 'mensaje.html' %}
+{% endblock %}

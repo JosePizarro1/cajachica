@@ -44,6 +44,13 @@ urlpatterns = [
     path('prestamos/', prestamos, name='prestamos'),
     path('ver_prestamos/', ver_prestamos, name='ver_prestamos'),
     path('realizar_pago/', realizar_pago, name='realizar_pago'),
+    path('reporte-anual/', reporte_anual, name='reporte_anual'),
+    path('guardar_datos/', guardar_datos, name='guardar_datos'),
+    path('ver_personal/', ver_personal, name='ver_personal'),
+    path('editar_personal/<int:id>/', editar_personal, name='editar_personal'),
+    path('crear_contraseña/<int:personal_id>/', crear_contraseña, name='crear_contraseña'),
+
+
 
 ]
 if settings.DEBUG:

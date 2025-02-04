@@ -9,12 +9,16 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 
+<!-- Scripts necesarios -->
 <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
 <main class="container mx-auto py-8">
@@ -30,7 +34,7 @@
         <thead class="bg-gray-700 text-white">
           <tr>
             <th class="px-4 py-2 text-left">Nombre</th>
-            <th class="px-4 py-2 text-left">Concepto</th>
+            <th class="px-4 py-2 text-left">Req</th>
             <th class="px-4 py-2 text-left">Local</th>
             <th class="px-4 py-2 text-left">Moneda</th>
             <th class="px-4 py-2 text-left">Fecha de Gasto</th>
@@ -43,7 +47,7 @@
           {% for gasto in gastos %}
           <tr class="hover:bg-gray-100">
             <td class="px-4 py-2">{{ gasto.nombre_proveedor|default:"Sin proveedor" }}</td>
-            <td class="px-4 py-2">{{ gasto.concepto_mayor_nivel.concepto_nombre }}</td>
+            <td class="px-4 py-2">REQ N°{{gasto.num_requerimiento}}(Id={{gasto.id_requerimiento}})</td>
             <td class="px-4 py-2">{{ gasto.local.nombre_local }}</td>
             <td class="px-4 py-2">{{ gasto.moneda }}</td>
             <td class="px-4 py-2">{{ gasto.fecha_gasto|date:"d/m/Y" }}</td>
@@ -81,7 +85,24 @@
         "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
       },
       "order": [[1, "desc"]], // Ordenar por Fecha de Gasto de mayor a menor
-      "pagingType": "simple_numbers" // Control de paginación más compacto
+      "pagingType": "simple_numbers", // Control de paginación más compacto
+      "dom": '<"top"lfB>rt<"bottom"ip><"clear">', // Agregar botones de exportación
+      "buttons": [
+        {
+          extend: 'excelHtml5',
+          text: 'Exportar a Excel',
+          className: 'bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded',
+          title: 'Reporte de Gastos'
+        },
+        {
+          extend: 'pdfHtml5',
+          text: 'Exportar a PDF',
+          className: 'bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded',
+          title: 'Reporte de Gastos',
+          orientation: 'landscape',
+          pageSize: 'A4'
+        }
+      ]
     });
   });
 </script>

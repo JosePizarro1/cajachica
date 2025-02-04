@@ -26,6 +26,68 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils import get_column_letter
 from django.utils.timezone import now
 from django.utils import timezone
+from django.db.models import Q
+import requests
+from requests.exceptions import Timeout, TooManyRedirects, RequestException, HTTPError
+
+
+def editar_personal(request, id):
+    personal = get_object_or_404(Personal, id=id)
+    return render(request, 'editar_personal.html', {'personal': personal})
+
+def crear_contraseña(request, personal_id):
+    personal = get_object_or_404(Personal, id=personal_id)
+
+    # Datos a enviar al otro sistema
+    nombre = personal.apellidos_nombres
+    telefono = personal.celular
+
+    # URL del otro sistema que recibe los datos
+    url_crear_cliente = "http://cafeteria.egatur.edu.pe/crear-cliente/"
+
+    # Parámetros para la petición GET
+    params = {
+        "nombre": nombre,
+        "telefono": telefono
+    }
+
+    try:
+        response = requests.get(url_crear_cliente, params=params, timeout=5)
+
+        # Verifica si la respuesta tiene contenido
+        if response.status_code == 201:
+            messages.success(request, "Cliente creado exitosamente en el otro sistema.")
+        elif response.status_code == 204:
+            # Si la respuesta es 204 (sin contenido), se puede mostrar un mensaje
+            messages.warning(request, "La respuesta del sistema está vacía, pero el cliente no presentó errores.")
+        else:
+            # Verifica si la respuesta tiene un cuerpo JSON
+            try:
+                response_data = response.json()
+                error_message = response_data.get("mensaje", "No se pudo crear el cliente.")
+                messages.warning(request, f"Error al crear el cliente: {error_message} (Código de estado: {response.status_code})")
+            except ValueError:
+                # Si la respuesta no es un JSON válido, muestra el contenido de la respuesta como texto
+                messages.error(request, f"Error al procesar la respuesta del sistema: {response.text} (Código de estado: {response.status_code})")
+
+    # Manejo de diferentes excepciones
+    except Timeout:
+        messages.error(request, "Error: Tiempo de espera agotado al conectar con el otro sistema.")
+
+    except TooManyRedirects:
+        messages.error(request, "Error: Demasiados redireccionamientos al conectar con el otro sistema.")
+
+    except HTTPError as http_err:
+        messages.error(request, f"Error HTTP al conectar con el otro sistema: {http_err}")
+
+    except RequestException as e:
+        # Cualquier otra excepción genérica de requests
+        messages.error(request, f"Error inesperado al conectar con el otro sistema: {str(e)}")
+
+    return redirect("ver_personal")
+
+
+
 
 def ficha_ingreso_view(request):
     if request.method == "POST":
@@ -147,7 +209,125 @@ def reportes(request):
         'conceptos_nivel_2': conceptos_nivel_2,
     })
 
+def reporte_anual(request):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reporte Anual"
 
+    # Estilos
+    bold_font = Font(bold=True)  # Negrita
+    bold_gray_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")  # Fondo gris claro
+
+    # Nombres de los meses
+    meses = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ]
+
+    # Encabezado
+    ws.append(['Concepto'] + meses)
+    for cell in ws[1]:
+        cell.font = bold_font
+
+    # Conceptos de nivel 1
+    conceptos_nivel_1 = Concepto.objects.filter(nivel=1)
+    row = 2
+    for concepto1 in conceptos_nivel_1:
+        valores_mensuales = []
+        for mes in meses:
+            mes_numero = meses.index(mes) + 1
+            total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_1=concepto1)
+                         .aggregate(total=Sum('importe'))['total'] or 0) \
+                      + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_1=concepto1)
+                         .aggregate(total=Sum('importe'))['total'] or 0)
+            valores_mensuales.append(total_mes)
+
+        ws.append([concepto1.concepto_nombre] + valores_mensuales)
+        row += 1
+
+        # Aplicar formato de negrita y fondo gris para nivel 1
+        for cell in ws[row - 1]:
+            cell.font = bold_font
+        ws[row - 1][0].fill = bold_gray_fill
+
+        # Conceptos de nivel 2
+        conceptos_nivel_2 = Concepto.objects.filter(id_concepto_padre=concepto1)
+        for concepto2 in conceptos_nivel_2:
+            valores_mensuales = []
+            for mes in meses:
+                mes_numero = meses.index(mes) + 1
+                total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_2=concepto2)
+                             .aggregate(total=Sum('importe'))['total'] or 0) \
+                          + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_2=concepto2)
+                             .aggregate(total=Sum('importe'))['total'] or 0)
+                valores_mensuales.append(total_mes)
+
+            ws.append(["   " + concepto2.concepto_nombre] + valores_mensuales)
+            row += 1
+
+            # Aplicar formato de negrita para nivel 2
+            ws[row - 1][0].font = bold_font
+
+            # Conceptos de nivel 3
+            conceptos_nivel_3 = Concepto.objects.filter(id_concepto_padre=concepto2)
+            for concepto3 in conceptos_nivel_3:
+                valores_mensuales = []
+                for mes in meses:
+                    mes_numero = meses.index(mes) + 1
+                    total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_3=concepto3)
+                                 .aggregate(total=Sum('importe'))['total'] or 0) \
+                              + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_3=concepto3)
+                                 .aggregate(total=Sum('importe'))['total'] or 0)
+                    valores_mensuales.append(total_mes)
+
+                ws.append(["      " + concepto3.concepto_nombre] + valores_mensuales)
+                row += 1
+
+    # Generar respuesta HTTP para la descarga del archivo
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="Reporte_Anual_{date.today().year}.xlsx"'
+    wb.save(response)
+    return response
+def ver_personal(request):
+    # Obtener todos los registros del modelo Personal
+    personal = Personal.objects.all()
+
+    return render(request, 'ver_personal.html', {'personal': personal})
+
+
+
+
+def guardar_datos(request):
+    if request.method == 'POST':
+        personal = Personal(
+            dni=request.POST['dni'],
+            apellidos_nombres=request.POST['apellidos_nombres'],
+            fecha_nacimiento=request.POST['fecha_nacimiento'],
+            celular=request.POST['celular'],
+            correo_personal=request.POST['correo_personal'],
+            correo_corporativo=request.POST['correo_corporativo'],
+            direccion=request.POST['direccion'],
+            periodo_inicio=request.POST['periodo_inicio'],
+            periodo_fin=request.POST['periodo_fin'],
+            tipo_trabajador=request.POST['tipo_trabajador'],
+            tipo_contrato=request.POST['tipo_contrato'],
+            tipo_pago=request.POST['tipo_pago'],
+            nombre_cuenta=request.POST['nombre_cuenta'],
+            numero_cuenta=request.POST['numero_cuenta'],
+            asignacion_familiar=request.POST.get('asignacion_familiar') == 'on',
+            ocupacion=request.POST['ocupacion'],
+            remuneracion=request.POST['remuneracion'],
+            regimen_salud=request.POST['regimen_salud'],
+            regimen_pensionario=request.POST['regimen_pensionario'],
+            situacion_educativa=request.POST['situacion_educativa'],
+            tipo_instruccion=request.POST['tipo_instruccion'],
+            institucion=request.POST['institucion'],
+            carrera_estudio=request.POST['carrera_estudio'],
+            ano_egreso=request.POST['ano_egreso'],
+        )
+        personal.save()
+        messages.success(request, 'Datos guardados correctamente.')
+        return redirect('ficha_ingreso')
 def generar_reporte_json(request):
     try:
         if request.method == 'GET':
@@ -621,7 +801,7 @@ def caja_chica(request):
             'notas': ingreso.observacion or '',
             'monto': Decimal(ingreso.importe),
             'moneda': ingreso.moneda,
-            'proveedor':ingreso.id_fondo.nombre_fondo,
+            'proveedor': ingreso.id_fondo.nombre_fondo if ingreso.id_fondo else "Sin fondo especifico",
             'usuario_creador': ingreso.usuario_creador.username if ingreso.usuario_creador else "Desconocido"
         })
 
@@ -706,60 +886,51 @@ def eliminar_proveedor(request, proveedor_id):
     proveedor.delete()
     messages.success(request, 'Proveedor eliminado exitosamente.')
     return redirect('proveedores')
+
+
+def validar_campos(metodo_pago, data):
+    if metodo_pago != "efectivo":
+        if not data.get("codigo_operacion"):
+            return "El código de operación es obligatorio."
+        if not data.get("fecha_operacion"):
+            return "La fecha de operación es obligatoria."
+        if not data.get("banco_operacion"):
+            return "El banco es obligatorio."
+    return None
+
 @login_required
+@csrf_exempt
 def editar_ingreso(request, id):
-    # Obtener el ingreso correspondiente al ID
     ingreso = get_object_or_404(Ingreso, id=id)
 
     if request.method == "POST":
-        # Obtener datos enviados en el formulario
-        id_fondo = request.POST.get('id_fondo')
-        metodo_pago = request.POST.get('metodo_pago')
-        codigo_operacion = request.POST.get('codigo_operacion', '').strip()
-        fecha_operacion = request.POST.get('fecha_operacion', '').strip()
-        observacion = request.POST.get('observacion')
-        fondo = get_object_or_404(Fondo, id=id_fondo)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"message": "Datos JSON inválidos."}, status=400)
 
-        # Validación si el método de pago es "yape" o "transferencia"
-        if metodo_pago in ["yape", "transferencia"]:
-            if not codigo_operacion:
-                messages.error(request, "El código de operación es obligatorio para métodos de pago Yape o Transferencia.")
-                return redirect('editar_ingreso', id=id)
-            if not fecha_operacion:
-                messages.error(request, "La fecha de operación es obligatoria para métodos de pago Yape o Transferencia.")
-                return redirect('editar_ingreso', id=id)
+        metodo_pago = data.get("metodo_pago")
+        error_msg = validar_campos(metodo_pago, data)
+        if error_msg:
+            return JsonResponse({"message": error_msg}, status=400)
 
-            # Validar y convertir fecha_operacion
-            try:
-                fecha_operacion_obj = datetime.strptime(fecha_operacion, '%Y-%m-%d').date()
-            except ValueError:
-                messages.error(request, "El formato de la fecha de operación es inválido. Debe estar en el formato YYYY-MM-DD.")
-                return redirect('editar_ingreso', id=id)
-        else:
-            # Limpiar valores si no se usan
-            codigo_operacion = None
-            fecha_operacion_obj = None
-
-        # Actualizar los campos del modelo
-        ingreso.id_fondo = fondo
+        ingreso.id_fondo = get_object_or_404(Fondo, id=data['id_fondo'])
         ingreso.metodo_pago = metodo_pago
-        ingreso.codigo_operacion = codigo_operacion
-        ingreso.fecha_operacion = fecha_operacion_obj
-        ingreso.observacion = observacion
+        ingreso.local = get_object_or_404(Local, id=data['local'])
 
-        # Guardar cambios
+        # Solo asignar codigo_operacion, fecha_operacion y banco si el metodo_pago no es "efectivo"
+        if metodo_pago != "efectivo":
+            ingreso.codigo_operacion = data.get('codigo_operacion')
+            ingreso.fecha_operacion = data.get('fecha_operacion')
+            ingreso.banco = get_object_or_404(Banco, id=data['banco_operacion']) if data.get('banco_operacion') else None
+
+        ingreso.observacion = data['observacion']
         ingreso.save()
 
-        # Enviar mensaje de éxito y redirigir
-        messages.success(request, "El ingreso ha sido actualizado exitosamente.")
-        return redirect('caja_chica')  # Ajusta el nombre de esta vista si es necesario
+        return JsonResponse({"message": "El ingreso ha sido actualizado exitosamente."}, status=200)
 
-    # Renderizar la página con los datos existentes del ingreso
-    context = {
-        'ingreso': ingreso,
-        'fondos': Fondo.objects.all()  # Asegúrate de pasar los fondos al contexto si se usan en el formulario
-    }
-    return render(request, 'edit_ingreso.html', context)
+    return JsonResponse({"message": "Método no permitido"}, status=405)
+
 
 @login_required
 def edit_item(request, id, tipo):
@@ -768,6 +939,7 @@ def edit_item(request, id, tipo):
     nivel_3_conceptos = Concepto.objects.filter(nivel=3)
     fondos = Fondo.objects.all()
     locales = Local.objects.all()
+    bancos = Banco.objects.all()
     if tipo == 'Extorno':
         ingreso = get_object_or_404(Ingreso, id=id)
                 # Convertir importe a cadena con punto decimal
@@ -775,6 +947,7 @@ def edit_item(request, id, tipo):
             ingreso.importe = f"{float(ingreso.importe):.2f}"
         return render(request, 'edit_ingreso.html', {'ingreso': ingreso,
                     'fondos': fondos,
+                    'bancos':bancos,
         'locales': locales,
         })
     elif tipo == 'Gasto':
@@ -948,8 +1121,11 @@ def guardar_oficial(request):
                     fecha_registro=date.today(),
                     fecha_gasto=date.today(),
                     moneda=gasto.moneda,  # Moneda por defecto del gasto asociado
-                    tipo_comprobante="Exhorto",
-                    nombre_proveedor=gasto.nombre_proveedor,  # Asignar el proveedor original
+                    tipo_comprobante=gasto.tipo_comprobante,
+                    campo_area=gasto.campo_area,
+                    num_requerimiento=gasto.num_requerimiento,
+                    id_requerimiento=gasto.id_requerimiento,
+                    nombre_proveedor=gasto.nombre_proveedor,
                     local=gasto.local,
                     tipo_pago="efectivo",
 
@@ -967,9 +1143,10 @@ def guardar_oficial(request):
                     fecha_registro=date.today(),
                     fecha_ingreso=date.today(),
                     importe=diferencia,
-                    metodo_pago="Pendiente",
+                    metodo_pago="Sin especificar",
                     moneda=gasto.moneda,  # Moneda por defecto del gasto asociado
                     extorno=True,
+                    observacion="gasto extra generado"
                 )
                 nuevo_ingreso.usuario_creador=request.user
                 nuevo_ingreso.save()
@@ -1276,7 +1453,7 @@ from datetime import datetime
 
 def comprobar_conceptos(tipo_comprobante, concepto_nivel_1, concepto_nivel_2, concepto_nivel_3):
     # Validación jerárquica de los conceptos (excepto para tipo_comprobante "Requerimiento")
-    if tipo_comprobante != 'Requerimiento':
+    if tipo_comprobante not in ['Requerimiento', 'Sin Requerimiento']:
         # Verifica si se proporcionó concepto_nivel_1
         if not concepto_nivel_1:
             return JsonResponse({'error': 'Debe seleccionar un concepto de nivel 1.'}, status=400)
@@ -1617,7 +1794,7 @@ def rendicion(request):
         usuarios_inactivos = User.objects.filter(is_active=False)
         # Combinar gastos del superusuario y de usuarios inactivos
         gastos_requerimientos = Gasto.objects.filter(
-            tipo_comprobante="Requerimiento",
+        Q(tipo_comprobante="Requerimiento") | Q(tipo_comprobante="Sin Requerimiento"),
             rendido=False
         ).filter(
             usuario_creador__in=[request.user] + list(usuarios_inactivos)

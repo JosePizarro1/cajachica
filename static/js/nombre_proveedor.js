@@ -77,7 +77,7 @@ $(document).ready(function () {
 
     // Mostrar/Ocultar campo Codigo de Operacion
     metodoPagoSelect.addEventListener('change', () => {
-      if (metodoPagoSelect.value === 'transferencia' || metodoPagoSelect.value === 'yape') {
+      if (metodoPagoSelect.value !== 'efectivo') {
         codigoOperacionContainer.style.display = 'block';
         fechaOperacionContainer.style.display = 'block';
       } else {

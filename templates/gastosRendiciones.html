@@ -68,7 +68,7 @@
     <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
       <!-- Título -->
       <h3 class="text-2xl font-semibold text-gray-800 mb-4">Rendición</h3>
-      
+
       <!-- Contenedor del importe inicial -->
       <div class="flex items-center justify-between mb-2">
         <span class="text-gray-600 text-lg font-medium">Importe del Gasto:</span>
@@ -76,7 +76,7 @@
         {{ gasto.importe|floatformat:2 }}
         </span>
       </div>
-     
+
       <!-- Contenedor del importe total -->
       <div class="flex items-center justify-between mb-4">
         <span class="text-gray-600 text-lg font-medium">Importe Total:</span>
@@ -84,10 +84,10 @@
           0.00
         </span>
       </div>
-      
+
       <!-- Separador -->
       <hr class="border-gray-300 my-4">
-      
+
       <!-- Contenedor del resultado -->
       <div class="flex items-center justify-between">
         <!-- Texto del estado -->
@@ -104,7 +104,7 @@
     <!-- Tabla dinámica de rendiciones -->
     <div class="bg-white p-4 rounded shadow-md">
       <h3 class="text-lg font-bold mb-4">Detalle de Rendiciones</h3>
-      
+
       <table class="min-w-full table-auto border-collapse mb-4">
         <thead class="bg-gray-700 text-white">
           <tr>
@@ -124,11 +124,11 @@
           <!-- Fila inicial -->
           <tr class="hover:bg-gray-100">
             <td class="px-4 py-2"><input type="date" name="rendiciones[0][fecha_operacion]" class="w-full border-gray-300 rounded" required /></td>
-            
+
         <td class="px-4 py-2">
             <div>
                 <div class="flex items-center space-x-2">
-                    <select id="nombre_proveedor" name="rendiciones[0][nombre_proveedor]" 
+                    <select id="nombre_proveedor" name="rendiciones[0][nombre_proveedor]"
                         class="block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent">
                         <option value="" disabled selected>Seleccione un proveedor</option>
                         {% for proveedor in proveedores %}
@@ -139,11 +139,11 @@
             </div>
         </td>
 
-            
+
     <td class="px-4 py-2"><input type="text" name="rendiciones[0][descripcion]" class="w-full border-gray-300 rounded" placeholder="Descripción" /></td>
-    
-    
-    
+
+
+
             <td class="px-4 py-2"><input type="text" name="rendiciones[0][numero_requerimiento]" class="w-full border-gray-300 rounded" placeholder="N° de Comprobante" required /></td>
       <td class="px-4 py-2">
         <select name="rendiciones[0][tipo_requerimiento]" class="w-full border-gray-300 rounded" required>
@@ -154,9 +154,8 @@
           <option value="Proforma">Proforma</option>
           <option value="Declaracion">Declaración</option>
           <option value="RHE">RHE</option>
-        <option value="Requerimiento">Requerimiento</option>
-              <option value="Boleta de pago">Boleta de pago</option>
-      
+        <option value="Boleta de pago">Boleta de pago</option>
+
         </select>
       </td>
       <td class="px-4 py-2"><input type="number" name="rendiciones[0][importe]" step="0.01" class="w-full border-gray-300 rounded importe-field" placeholder="Importe" required /></td>
@@ -187,7 +186,7 @@
           </tr>
         </tbody>
       </table>
-      
+
       <!-- Botones -->
       <div class="flex justify-between">
         <button id="add-row" type="button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded inline-flex items-center">
@@ -196,7 +195,7 @@
           </svg>
           Agregar Rendición
         </button>
-        
+
         <button id="confirm-save" type="button" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
             Guardar
         </button>
@@ -227,10 +226,10 @@
         var conceptoNivel1Id = $(this).val(); // Obtener el ID seleccionado de Nivel 1
         var nivel2Dropdown = $(this).closest('td').next().find('select'); // Dropdown de Nivel 2
         var nivel3Dropdown = nivel2Dropdown.closest('td').next().find('select'); // Dropdown de Nivel 3
-        
+
         nivel2Dropdown.empty().append('<option value="">Seleccione</option>'); // Limpiar Nivel 2
         nivel3Dropdown.empty().append('<option value="">Seleccione</option>'); // Limpiar Nivel 3
-        
+
         if (conceptoNivel1Id) {
             $.ajax({
                 url: '{% url "get_nivel_2_conceptos" %}',
@@ -252,9 +251,9 @@
     $('table').on('change', 'select[name^="rendiciones"][name$="[concepto_nivel_2]"]', function () {
         var conceptoNivel2Id = $(this).val(); // Obtener el ID seleccionado de Nivel 2
         var nivel3Dropdown = $(this).closest('td').next().find('select'); // Dropdown de Nivel 3
-        
+
         nivel3Dropdown.empty().append('<option value="">Seleccione</option>'); // Limpiar Nivel 3
-        
+
         if (conceptoNivel2Id) {
             $.ajax({
                 url: '{% url "get_nivel_3_conceptos" %}',
@@ -483,7 +482,7 @@ saveButton.addEventListener('click', (e) => {
       </select>
     </td>
         <td class="px-4 py-2"><input type="number" name="rendiciones[${indice}][importe]" step="0.01" class="w-full border-gray-300 rounded importe-field" placeholder="Importe" required /></td>
-        
+
         <td class="px-4 py-2">
           <select name="rendiciones[${indice}][concepto_nivel_1]" class="w-full border-gray-300 rounded">
             <option value="">Seleccione</option>

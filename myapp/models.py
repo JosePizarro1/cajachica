@@ -199,10 +199,10 @@ class Rendicion(models.Model):
         blank=True,
         related_name='rendiciones_creadas'
     )
-    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
-    fecha_operacion = models.DateField(blank=True, null=True)  # Fecha de la operaci¨®n
-    descripcion = models.TextField(blank=True, null=True)  # Descripci¨®n
-    numero_requerimiento = models.CharField(max_length=150,blank=True, null=True)  # N¨²mero de Requerimiento
+    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta linea agregar la fecha autom¨¢tica
+    fecha_operacion = models.DateField(blank=True, null=True)  # Fecha de la operacion
+    descripcion = models.TextField(blank=True, null=True)  # Descripcion
+    numero_requerimiento = models.CharField(max_length=150,blank=True, null=True)  # Numero de Requerimiento
     importe = models.DecimalField(max_digits=10, decimal_places=2,blank=True, null=True)  # Importe
     tipo_comprobante = models.CharField(max_length=50, null=True, blank=True)
 
@@ -279,4 +279,48 @@ class Ingreso(models.Model):
 
     def __str__(self):
         return f"Ingreso {self.id}"
+
+class Personal(models.Model):
+    # Datos del trabajador
+    dni = models.CharField(max_length=20, blank=True, null=True)
+    apellidos_nombres = models.CharField(max_length=255, blank=True, null=True)
+    fecha_nacimiento = models.DateField(blank=True, null=True)
+    celular = models.CharField(max_length=20, blank=True, null=True)
+    correo_personal = models.EmailField(blank=True, null=True)
+    correo_corporativo = models.EmailField(blank=True, null=True)
+    direccion = models.CharField(max_length=255, blank=True, null=True)
+
+    # Datos laborales
+    periodo_inicio = models.DateField(blank=True, null=True)
+    periodo_fin = models.DateField(null=True, blank=True)
+    tipo_trabajador = models.CharField(max_length=50, blank=True, null=True)
+    tipo_contrato = models.CharField(max_length=50, blank=True, null=True)
+    tipo_pago = models.CharField(max_length=50, choices=[('efectivo', 'Efectivo'), ('deposito', 'Depósito')], blank=True, null=True)
+    nombre_cuenta = models.CharField(max_length=100, blank=True, null=True)
+    numero_cuenta = models.CharField(max_length=30, blank=True, null=True)
+    asignacion_familiar = models.BooleanField(default=False, blank=True, null=True)
+
+    # Nuevos campos agregados
+    ocupacion = models.CharField(max_length=100, blank=True, null=True)  # Ocupación
+    remuneracion = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # Remuneración
+
+    # Datos de seguridad social
+    regimen_salud = models.CharField(max_length=50, choices=[('essalud', 'EsSalud'), ('sis', 'SIS')], blank=True, null=True)
+    regimen_pensionario = models.CharField(max_length=50, choices=[('onp', 'ONP'), ('afp', 'AFP')], blank=True, null=True)
+
+    # Datos de la situación educativa
+    situacion_educativa = models.CharField(max_length=255, blank=True, null=True)
+    tipo_instruccion = models.CharField(max_length=255, blank=True, null=True)
+    institucion = models.CharField(max_length=255, blank=True, null=True)
+    carrera_estudio = models.CharField(max_length=255, blank=True, null=True)
+    ano_egreso = models.CharField(max_length=4, blank=True, null=True)
+    contraseña_creada = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.apellidos_nombres} - {self.dni}"
+
+
+
+
+
 

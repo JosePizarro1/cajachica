@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import Fondo, Local, Concepto, CajaChica, Rendicion, Gasto, Ingreso,Proveedor,CuentaBancaria,Banco,Prestamo,SaldoInicial,Pago
+from .models import Fondo, Local, Concepto, CajaChica, Rendicion, Gasto, Ingreso,Proveedor,CuentaBancaria,Banco,Prestamo,SaldoInicial,Pago,Personal
+
+class PersonalAdmin(admin.ModelAdmin):
+    list_display = ('dni','contraseña_creada', 'apellidos_nombres', 'celular', 'correo_personal', 'correo_corporativo')
+    search_fields = ('dni', 'apellidos_nombres', 'correo_personal', 'correo_corporativo', 'celular', 'ocupacion')
+    list_filter = ('tipo_trabajador', 'tipo_pago', 'regimen_salud', 'regimen_pensionario', 'situacion_educativa')
+    ordering = ('apellidos_nombres',)
+    list_per_page = 20  # Número de registros por página
+
+admin.site.register(Personal, PersonalAdmin)
 
 class PagoAdmin(admin.ModelAdmin):
     list_display = ('prestamo', 'cuota', 'monto_pagado', 'fecha_pago')
@@ -75,8 +84,9 @@ class RendicionAdmin(admin.ModelAdmin):
 # Registro del modelo Gasto
 @admin.register(Gasto)
 class GastoAdmin(admin.ModelAdmin):
-    list_display = ('fecha_gasto', 'local', 'tipo_comprobante', 'tipo_pago', 'observacion')
-    list_filter = ('local', 'tipo_comprobante', 'tipo_pago')
+    list_display = ('fecha_registro','importe','rendido','fecha_gasto', 'local', 'tipo_comprobante', 'tipo_pago', 'observacion')
+    list_filter = ('local', 'tipo_comprobante', 'tipo_pago','rendido')
+
 @admin.register(Ingreso)
 class IngresoAdmin(admin.ModelAdmin):
     list_display = ('id', 'fecha_ingreso', 'importe', 'id_fondo', 'metodo_pago', 'moneda', 'local')
