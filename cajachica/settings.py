@@ -29,7 +29,7 @@ LOGIN_URL = 'login'  # Este es el nombre que usaste en la URL de login
 LOGOUT_REDIRECT_URL = 'login'
 
 # Establece el tiempo de expiración de la cookie de sesión en segundos (3600 segundos = 1 hora)
-SESSION_COOKIE_AGE = 3600  # Expira en 1 hora
+SESSION_COOKIE_AGE = 36000  # Expira en 1 hora
 
 # Opcionalmente, puedes agregar esta opción para que las sesiones expiren cuando el usuario cierre el navegador:
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True

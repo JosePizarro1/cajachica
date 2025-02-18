@@ -22,30 +22,46 @@
 
   <!-- Configuración de Tailwind -->
   <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Roboto', 'sans-serif'],
-          },
-          colors: {
-            primary: '#1F2937',
-            secondary: '#4B5563',
-            accent: '#10B981',
-          },
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Roboto', 'sans-serif'],
+      },
+      colors: {
+        primary: '#1F2937',
+        secondary: '#4B5563',
+        accent: '#10B981',
+      },
+      backgroundImage: {
+        'sidebar-gradient': 'linear-gradient(135deg, #255A9E, #19497C)', // Gradiente
+      },
+      animation: {
+        'logo-zoom': 'logo-zoom 4s ease-in-out infinite', // Animación para el logo
+      },
+      keyframes: {
+        'logo-zoom': {
+          '0%': { transform: 'scale(1)' },
+          '30%': { transform: 'scale(1.1)' },
+          '70%': { transform: 'scale(1)' },
         },
       },
-    };
+    },
+  },
+};
+
   </script>
 </head>
 <body class="bg-gray-100 font-sans">
 
   <div class="flex h-screen">
     <!-- Sidebar -->
-    <aside class="w-64 bg-primary text-gray-200 md:block hidden h-full">
+<aside id="sidebar" class="w-64 bg-sidebar-gradient text-gray-200 h-full transition-all duration-300">
       <div class="p-6">
-        <h1 class="text-2xl font-bold text-accent">EGATUR</h1>
-        <p class="text-sm">Caja Chica</p>
+<img src="{% static 'images/logo.png' %}" alt="Logo" class="py-2 logo animate-logo-zoom w-4/3"/>
+    <button id="close-sidebar" class="py-2 text-gray-400 hover:text-white">
+      <i class="fas fa-chevron-left"></i>
+    </button>
       </div>
       <nav class="mt-6">
         <!-- Dashboard -->
@@ -119,9 +135,9 @@
         <!-- Topbar -->
         <header class="bg-white shadow p-4 flex justify-between items-center">
             <div class="flex items-center">
-                <button id="sidebar-toggle" class="text-gray-500 md:hidden">
-                    <i class="fas fa-bars h-6 w-6"></i>
-                </button>
+              <button id="sidebar-toggle" class="text-gray-500">
+                <i class="fas fa-bars h-6 w-6"></i>
+              </button>
             </div>
             <div class="flex items-center">
                 {% if user.is_authenticated %}
@@ -154,14 +170,21 @@
   </div>
 
   <!-- Script para el toggle del sidebar -->
-  <script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
     const sidebarToggle = document.getElementById('sidebar-toggle');
-    const sidebar = document.querySelector('aside');
+    const closeSidebar = document.getElementById('close-sidebar');
+    const sidebar = document.getElementById('sidebar');
 
     sidebarToggle.addEventListener('click', () => {
-      sidebar.classList.toggle('hidden');
+      sidebar.classList.toggle('hidden'); // Oculta/muestra el sidebar
     });
-  </script>
+
+    closeSidebar.addEventListener('click', () => {
+      sidebar.classList.add('hidden'); // Oculta solo cuando se presiona cerrar
+    });
+  });
+</script>
 
 </body>
 </html>

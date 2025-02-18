@@ -101,29 +101,15 @@ class CajaChica(models.Model):
         return f"Caja Chica {self.id} - Fecha: {self.fecha}"
 
 from datetime import date
-# Modelo para la tabla "Gastos"
 class Gasto(models.Model):
-    usuario_creador = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='gastos_creados'
-    )
+    usuario_creador = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name='gastos_creados')
     fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
     fecha_gasto = models.DateField(blank=True, null=True)
     concepto_nivel_1 = models.ForeignKey(Concepto, null=True, blank=True, related_name='nivel_1', on_delete=models.CASCADE)
     concepto_nivel_2 = models.ForeignKey(Concepto, null=True, blank=True, related_name='nivel_2', on_delete=models.CASCADE)
     concepto_nivel_3 = models.ForeignKey(Concepto, null=True, blank=True, related_name='nivel_3', on_delete=models.CASCADE)
-    nombre_proveedor = models.ForeignKey(
-        Proveedor,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='gastos'
-    )
+    nombre_proveedor = models.ForeignKey(Proveedor,on_delete=models.SET_NULL,null=True,blank=True,related_name='gastos')
     local = models.ForeignKey(Local, null=True, blank=True, on_delete=models.CASCADE, related_name='gastos_local')
-
     tipo_comprobante = models.CharField(max_length=50, null=True, blank=True)
     num_comprobante = models.CharField(max_length=80, null=True, blank=True)  # Campo agregado
     fecha_emision_comprobante = models.DateField(null=True, blank=True)  # Campo agregado
@@ -171,15 +157,16 @@ class Gasto(models.Model):
         null=True,
         blank=True
     )
-    banco = models.ForeignKey(
-        Banco,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='gastos_banco'
-    )
+    banco = models.ForeignKey(Banco,on_delete=models.SET_NULL,null=True,blank=True,related_name='gastos_banco')
     # Relación con el préstamo
     prestamo = models.ForeignKey('Prestamo', null=True, blank=True, on_delete=models.SET_NULL, related_name='gastos')
+    gasto_origen = models.ForeignKey(
+        'self',  # Relación consigo mismo
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,  # Si se borra el gasto original, no borrar los generados
+        related_name='gastos_generados'
+    )
 
     def concepto_mayor_nivel(self):
         """
@@ -217,14 +204,15 @@ class Rendicion(models.Model):
     )
 
     gasto = models.ForeignKey(
-        'Gasto', null=True, blank=True, on_delete=models.SET_NULL, related_name='rendiciones_gasto'
+        'Gasto', null=True, blank=True, on_delete=models.CASCADE, related_name='rendiciones_gasto'
     )
     proveedor = models.ForeignKey(
-        'Proveedor', null=True, blank=True, on_delete=models.SET_NULL, related_name='rendiciones_proveedor'
+        'Proveedor', null=True, blank=True, on_delete=models.CASCADE, related_name='rendiciones_proveedor'
     )
 
     def __str__(self):
         return f"Rendicion {self.numero_requerimiento} - Importe: {self.importe}"
+
 class Prestamo(models.Model):
     fecha_prestamo = models.DateField()
     fecha_vencimiento = models.DateField()
@@ -242,20 +230,8 @@ class Prestamo(models.Model):
 
 
 class Ingreso(models.Model):
-    usuario_creador = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='ingresos_creados'
-    )
-    prestamo = models.ForeignKey(
-        'Prestamo',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='ingresos'
-    )
+    usuario_creador = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name='ingresos_creados')
+    prestamo = models.ForeignKey('Prestamo',on_delete=models.SET_NULL,null=True,blank=True,related_name='ingresos')
     fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
     fecha_ingreso = models.DateField(blank=True, null=True)
     importe = models.DecimalField(max_digits=10, decimal_places=2)
@@ -269,14 +245,14 @@ class Ingreso(models.Model):
     # Nuevo campo 'extorno' por defecto a False
     extorno = models.BooleanField(default=False, null=True, blank=True)
     # Nuevo campo 'banco' relacionado con el modelo Banco
-    banco = models.ForeignKey(
-        Banco,
-        on_delete=models.SET_NULL,  # Si el banco es eliminado, no elimina el ingreso, sino que pone el campo a null
+    banco = models.ForeignKey(Banco,on_delete=models.SET_NULL,null=True,blank=True,related_name='ingresos_banco')
+    gasto_origen = models.ForeignKey(
+        Gasto,
         null=True,
         blank=True,
-        related_name='ingresos_banco'  # Nombre de relación inversa (opcional)
+        on_delete=models.SET_NULL,
+        related_name='ingreso_generado'
     )
-
     def __str__(self):
         return f"Ingreso {self.id}"
 
@@ -298,15 +274,17 @@ class Personal(models.Model):
     tipo_pago = models.CharField(max_length=50, choices=[('efectivo', 'Efectivo'), ('deposito', 'Depósito')], blank=True, null=True)
     nombre_cuenta = models.CharField(max_length=100, blank=True, null=True)
     numero_cuenta = models.CharField(max_length=30, blank=True, null=True)
+    cci = models.CharField(max_length=20, blank=True, null=True)  # Código de Cuenta Interbancario
     asignacion_familiar = models.BooleanField(default=False, blank=True, null=True)
 
     # Nuevos campos agregados
     ocupacion = models.CharField(max_length=100, blank=True, null=True)  # Ocupación
-    remuneracion = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)  # Remuneración
+    remuneracion = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True,default=0.00)  # Remuneración
 
     # Datos de seguridad social
     regimen_salud = models.CharField(max_length=50, choices=[('essalud', 'EsSalud'), ('sis', 'SIS')], blank=True, null=True)
     regimen_pensionario = models.CharField(max_length=50, choices=[('onp', 'ONP'), ('afp', 'AFP')], blank=True, null=True)
+    regimen_pensionario_details = models.CharField(max_length=255, blank=True, null=True)
 
     # Datos de la situación educativa
     situacion_educativa = models.CharField(max_length=255, blank=True, null=True)

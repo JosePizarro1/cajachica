@@ -25,32 +25,48 @@ $(document).ready(function () {
         codigoComprobanteContainer.style.display = 'none';
         fechaComprobanteContainer.style.display = 'none';
       }
+  // Primero, verifica "Sin Requerimiento"
+  if (TipoSelect.value === 'Sin Requerimiento') {
+    // Bloquear y limpiar los campos de Conceptos
+    conceptoNivel1.disabled = true;
+    conceptoNivel2.disabled = true;
+    conceptoNivel3.disabled = true;
 
-      if (TipoSelect.value === 'Requerimiento') {
-        // Bloquear y limpiar los campos de Conceptos
-        conceptoNivel1.disabled = true;
-        conceptoNivel2.disabled = true;
-        conceptoNivel3.disabled = true;
+    conceptoNivel1.value = '';
+    conceptoNivel2.value = '';
+    conceptoNivel3.value = '';
 
-        conceptoNivel1.value = '';
-        conceptoNivel2.value = '';
-        conceptoNivel3.value = '';
+    // Ocultar los campos de ID Requerimiento y demás relacionados
+    idRequerimientoContainer.style.display = 'none';
+    numRequerimientoContainer.style.display = 'none';
+    campoContainer.style.display = 'none';
 
-        // Mostrar el campo ID Requerimiento
-        idRequerimientoContainer.style.display = 'block';
-        numRequerimientoContainer.style.display = 'block';
-        campoContainer.style.display='block';
-      } else {
-        // Habilitar los campos de Conceptos
-        conceptoNivel1.disabled = false;
-        conceptoNivel2.disabled = false;
-        conceptoNivel3.disabled = false;
+  } else if (TipoSelect.value === 'Requerimiento') {
+    // Bloquear y limpiar los campos de Conceptos
+    conceptoNivel1.disabled = true;
+    conceptoNivel2.disabled = true;
+    conceptoNivel3.disabled = true;
 
-        // Ocultar el campo ID Requerimiento
-        idRequerimientoContainer.style.display = 'none';
-        numRequerimientoContainer.style.display = 'none';
-        campoContainer.style.display='none';
-      }
+    conceptoNivel1.value = '';
+    conceptoNivel2.value = '';
+    conceptoNivel3.value = '';
+
+    // Mostrar el campo ID Requerimiento
+    idRequerimientoContainer.style.display = 'block';
+    numRequerimientoContainer.style.display = 'block';
+    campoContainer.style.display = 'block';
+
+  } else {
+    // Habilitar los campos de Conceptos
+    conceptoNivel1.disabled = false;
+    conceptoNivel2.disabled = false;
+    conceptoNivel3.disabled = false;
+
+    // Ocultar el campo ID Requerimiento
+    idRequerimientoContainer.style.display = 'none';
+    numRequerimientoContainer.style.display = 'none';
+    campoContainer.style.display = 'none';
+  }
       if(TipoSelect.value === 'Boleta de pago'){
         campoMesContainer.style.display = 'block';
 

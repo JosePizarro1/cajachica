@@ -1,8 +1,11 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="icon" href="{% static 'images/icon.png' %}" type="image/png">
+
     <title>Ficha de Ingreso de Personal</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -32,7 +35,7 @@
 <body>
     <div class="container">
         <h2 class="text-center mb-4">Ficha de Ingreso de Personal</h2>
-        <form id="fichaForm" method="POST" action="{% url 'guardar_datos' %}">
+        <form id="fichaForm" method="POST" action="{% url 'guardar_datos_editados' personal.id %}">
             {% csrf_token %}
             <!-- Datos del Trabajador -->
             <div class="form-section">
@@ -40,36 +43,36 @@
                 <div class="row">
                     <div class="col-md-6">
                         <label class="form-label">N° DNI</label>
-                        <input type="text" class="form-control" name="dni"required>
+                        <input type="text" class="form-control" name="dni" value="{{ personal.dni }}" readonly>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Apellidos y Nombres</label>
-                        <input type="text" class="form-control" name="apellidos_nombres"required>
+                        <input type="text" class="form-control" name="apellidos_nombres" value="{{ personal.apellidos_nombres }}"required>
                     </div>
                 </div>
                 <div class="row mt-3">
                     <div class="col-md-6">
                         <label class="form-label">Fecha de Nacimiento</label>
-                        <input type="date" class="form-control" name="fecha_nacimiento" required>
+                        <input type="date" class="form-control" name="fecha_nacimiento" value="{{ personal.fecha_nacimiento|date:'Y-m-d' }}" required>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">N° Celular</label>
-                        <input type="text" class="form-control" name="celular" required>
+                        <input type="text" class="form-control" name="celular" value="{{ personal.celular }}" required>
                     </div>
                 </div>
                 <div class="row mt-3">
                     <div class="col-md-6">
                         <label class="form-label">Correo Personal</label>
-                        <input type="email" class="form-control" name="correo_personal">
+                        <input type="email" class="form-control" name="correo_personal" value="{{ personal.correo_personal }}">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Correo Corporativo</label>
-                        <input type="email" class="form-control" name="correo_corporativo">
+                        <input type="email" class="form-control" name="correo_corporativo" value="{{ personal.correo_corporativo }}">
                     </div>
                 </div>
                 <div class="mt-3">
                     <label class="form-label">Dirección</label>
-                    <input type="text" class="form-control" name="direccion">
+                    <input type="text" class="form-control" name="direccion" value="{{ personal.direccion }}">
                 </div>
             </div>
 
@@ -79,55 +82,40 @@
                 <label class="form-label">Período Laboral</label>
                 <div class="row">
                     <div class="col-md-6">
-                        <input type="date" class="form-control" name="periodo_inicio" required>
+                        <input type="date" class="form-control" name="periodo_inicio" value="{{ personal.periodo_inicio|date:'Y-m-d' }}" required>
                     </div>
                     <div class="col-md-6">
-                        <input type="date" class="form-control" name="periodo_fin" required>
+                        <input type="date" class="form-control" name="periodo_fin" value="{{ personal.periodo_fin|date:'Y-m-d' }}" required>
                     </div>
                 </div>
                 <div class="mt-3">
                     <label class="form-label">Tipo de Trabajador</label>
-                    <input type="text" class="form-control" name="tipo_trabajador">
+                    <input type="text" class="form-control" name="tipo_trabajador" value="{{ personal.tipo_trabajador }}">
                 </div>
                 <div class="mt-3">
                     <label class="form-label">Tipo de Contrato</label>
-                    <input type="text" class="form-control" name="tipo_contrato">
+                    <input type="text" class="form-control" name="tipo_contrato" value="{{ personal.tipo_contrato }}">
                 </div>
                 <div class="mt-3">
                     <label class="form-label">Tipo de Pago</label>
                     <select class="form-select" name="tipo_pago">
-                        <option value="efectivo">Efectivo</option>
-                        <option value="deposito">Depósito</option>
+                        <option value="efectivo" {% if personal.tipo_pago == "efectivo" %}selected{% endif %}>Efectivo</option>
+                        <option value="deposito" {% if personal.tipo_pago == "deposito" %}selected{% endif %}>Depósito</option>
                     </select>
                 </div>
-                <div class="row mt-3">
-                    <div class="col-md-4">
-                        <label class="form-label">Nombre del Banco</label>
-                        <input type="text" class="form-control" name="nombre_cuenta">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">N° de Cuenta</label>
-                        <input type="text" class="form-control" name="numero_cuenta">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">CCI (Código de Cuenta Interbancario)</label>
-                        <input type="text" class="form-control" name="cci">
-                    </div>
-                </div>
-
-
                 <div class="mt-3">
                     <label class="form-label">Asignación Familiar</label>
-                    <input type="checkbox" class="form-check-input" name="asignacion_familiar">
+                    <input type="checkbox" class="form-check-input" name="asignacion_familiar" {% if personal.asignacion_familiar %}checked{% endif %}>
                 </div>
+
                 <!-- Nueva sección para Ocupación y Remuneración -->
                 <div class="mt-3">
                     <label class="form-label">Ocupación</label>
-                    <input type="text" class="form-control" name="ocupacion">
+                    <input type="text" class="form-control" name="ocupacion" value="{{ personal.ocupacion }}">
                 </div>
                 <div class="mt-3">
                     <label class="form-label">Remuneración</label>
-                    <input type="number" class="form-control" name="remuneracion" step="0.01" min="0" value="0.00">
+                    <input type="number" class="form-control" name="remuneracion" step="0.01" min="0" value="{{ personal.remuneracion}}">
                 </div>
 
             </div>
@@ -135,73 +123,67 @@
             <!-- Datos de Seguridad Social -->
             <div class="form-section">
                 <h3>3. Datos de Seguridad Social</h3>
+
                 <label class="form-label">Régimen de Aseg. de Salud</label>
                 <select class="form-select" name="regimen_salud">
-                    <option value="essalud">EsSalud</option>
-                    <option value="sis">SIS</option>
+                    <option value="essalud" {% if personal.regimen_salud == "essalud" %}selected{% endif %}>EsSalud</option>
+                    <option value="sis" {% if personal.regimen_salud == "sis" %}selected{% endif %}>SIS</option>
                 </select>
+
                 <label class="form-label mt-3">Régimen Pensionario</label>
                 <select class="form-select" name="regimen_pensionario">
-                    <option value="onp">ONP</option>
-                    <option value="afp">AFP</option>
+                    <option value="onp" {% if personal.regimen_pensionario == "onp" %}selected{% endif %}>ONP</option>
+                    <option value="afp" {% if personal.regimen_pensionario == "afp" %}selected{% endif %}>AFP</option>
                 </select>
                 <!-- Campo para detalles (se actualizará dependiendo de la opción seleccionada) -->
                 <label class="form-label" for="regimen_pensionario_details" >Detalles AFP/ONP</label>
-                <input type="text" class="form-control" id="regimen_pensionario_details" name="regimen_pensionario_details" placeholder="Complete su AFP/ONP">
+                <input type="text" class="form-control" id="regimen_pensionario_details" name="regimen_pensionario_details" placeholder="Complete su AFP/ONP" value="{{ personal.regimen_pensionario_details}}">
 
             </div>
+
 
             <!-- Datos de la Situación Educativa -->
             <div class="form-section">
                 <h3>4. Datos de la Situación Educativa</h3>
+
                 <label class="form-label">Situación Educativa</label>
-                <input type="text" class="form-control" name="situacion_educativa">
+                <input type="text" class="form-control" name="situacion_educativa" value="{{ personal.situacion_educativa|default_if_none:'' }}">
+
                 <label class="form-label mt-3">Tipo de Instrucción Educativa</label>
-                <input type="text" class="form-control" name="tipo_instruccion">
+                <input type="text" class="form-control" name="tipo_instruccion" value="{{ personal.tipo_instruccion|default_if_none:'' }}">
+
                 <label class="form-label mt-3">Nombre de la Institución</label>
-                <input type="text" class="form-control" name="institucion">
+                <input type="text" class="form-control" name="institucion" value="{{ personal.institucion|default_if_none:'' }}">
+
                 <label class="form-label mt-3">Carrera de Estudio</label>
-                <input type="text" class="form-control" name="carrera_estudio">
+                <input type="text" class="form-control" name="carrera_estudio" value="{{ personal.carrera_estudio|default_if_none:'' }}">
+
                 <label class="form-label mt-3">Año de Egreso</label>
-                <input type="text" class="form-control" name="ano_egreso">
+                <input type="text" class="form-control" name="ano_egreso" value="{{personal.ano_egreso|default_if_none:'' }}">
             </div>
+
 
             <button type="submit" class="btn btn-primary w-100 mt-3">Enviar</button>
         </form>
     </div>
 
-<script>
-document.getElementById('fichaForm').addEventListener('submit', async function (event) {
-    event.preventDefault(); // Evita la recarga de la página
-
-    let formData = new FormData(this);
-
-    let response = await fetch(this.action, {
-        method: 'POST',
-        body: formData
-    });
-
-    let data = await response.json();
-
-    if (response.ok) {
-        Swal.fire({
-            icon: 'success',
-            title: 'Éxito',
-            text: data.success
-        }).then(() => {
-            // Redirige a la vista 'ver_personal' después del éxito
-            window.location.href = '{% url "ver_personal" %}';
-        });
-    } else {
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: data.error
-        });
-    }
-});
-</script>
-
-
+    <script>
+        function confirmarEnvio() {
+            Swal.fire({
+                title: "¿Estás seguro?",
+                text: "Una vez enviado, no podrás modificar los datos de inmediato.",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonColor: "#3085d6",
+                cancelButtonColor: "#d33",
+                confirmButtonText: "Sí, enviar",
+                cancelButtonText: "Cancelar"
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById("fichaForm").submit();
+                }
+            });
+        }
+    </script>
 </body>
 </html>

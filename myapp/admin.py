@@ -73,6 +73,7 @@ class CajaChicaAdmin(admin.ModelAdmin):
 class RendicionAdmin(admin.ModelAdmin):
     list_display = (
         'numero_requerimiento',
+        'usuario_creador',
         'fecha_operacion',
         'importe',
         'concepto_nivel_1',
@@ -84,12 +85,12 @@ class RendicionAdmin(admin.ModelAdmin):
 # Registro del modelo Gasto
 @admin.register(Gasto)
 class GastoAdmin(admin.ModelAdmin):
-    list_display = ('fecha_registro','importe','rendido','fecha_gasto', 'local', 'tipo_comprobante', 'tipo_pago', 'observacion')
+    list_display = ('fecha_gasto','usuario_creador','importe','rendido','fecha_gasto', 'local', 'tipo_comprobante', 'tipo_pago', 'observacion')
     list_filter = ('local', 'tipo_comprobante', 'tipo_pago','rendido')
 
 @admin.register(Ingreso)
 class IngresoAdmin(admin.ModelAdmin):
-    list_display = ('id', 'fecha_ingreso', 'importe', 'id_fondo', 'metodo_pago', 'moneda', 'local')
+    list_display = ('id', 'fecha_ingreso','usuario_creador', 'importe', 'id_fondo', 'metodo_pago', 'moneda', 'local')
     list_filter = ('fecha_ingreso', 'metodo_pago', 'moneda', 'local')
 @admin.register(Proveedor)
 class ProveedorAdmin(admin.ModelAdmin):

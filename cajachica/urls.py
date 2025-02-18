@@ -45,11 +45,14 @@ urlpatterns = [
     path('ver_prestamos/', ver_prestamos, name='ver_prestamos'),
     path('realizar_pago/', realizar_pago, name='realizar_pago'),
     path('reporte-anual/', reporte_anual, name='reporte_anual'),
-    path('guardar_datos/', guardar_datos, name='guardar_datos'),
+    path('guardar_datos/', guardar_datos1, name='guardar_datos'),
     path('ver_personal/', ver_personal, name='ver_personal'),
     path('editar_personal/<int:id>/', editar_personal, name='editar_personal'),
     path('crear_contraseña/<int:personal_id>/', crear_contraseña, name='crear_contraseña'),
-
+    path('generar_pdf/<int:persona_id>/', generar_pdf, name='generar_pdf'),
+    path('editar-ficha/<int:id_personal>/', guardar_datos_editados, name="guardar_datos_editados"),
+    path('reporte-mensual/', reporte_mensual, name='reporte_mensual'),
+    path('reporte-diario/', generar_reporte_diario, name='reporte_diario'),
 
 
 ]

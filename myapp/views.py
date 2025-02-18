@@ -29,10 +29,22 @@ from django.utils import timezone
 from django.db.models import Q
 import requests
 from requests.exceptions import Timeout, TooManyRedirects, RequestException, HTTPError
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from .models import Personal
+from django.shortcuts import get_object_or_404
+from datetime import date
+from decimal import Decimal
+from django.shortcuts import render
+import urllib.parse
 
 
 def editar_personal(request, id):
     personal = get_object_or_404(Personal, id=id)
+    # Convertir remuneración a string con dos decimales si no es None
+    if personal.remuneracion is not None:
+        personal.remuneracion = f"{float(personal.remuneracion):.2f}"
     return render(request, 'editar_personal.html', {'personal': personal})
 
 def crear_contraseña(request, personal_id):
@@ -85,41 +97,211 @@ def crear_contraseña(request, personal_id):
         messages.error(request, f"Error inesperado al conectar con el otro sistema: {str(e)}")
 
     return redirect("ver_personal")
+from reportlab.lib import colors
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+import os
+from django.conf import settings
+
+def draw_centered_text(p, text, y_position, font="Helvetica-Bold", size=16, page_width=letter[0]):
+    p.setFont(font, size)
+    text_width = p.stringWidth(text, font, size)
+    x_position = (page_width - text_width) / 2  # Centrar el texto
+    p.drawString(x_position, y_position, text)
+
+def draw_logo(p, image_name, x=490, y=690, width=75, height=75):
+    image_path = os.path.join(settings.BASE_DIR, "static/images", image_name)
+
+    if os.path.exists(image_path):  # Verifica si la imagen existe
+        p.drawImage(image_path, x, y, width, height, mask='auto')
+    else:
+        print(f"⚠️ Error: No se encontró la imagen en {image_path}")
 
 
+def generar_pdf(request, persona_id):
+    try:
+        persona = Personal.objects.get(id=persona_id)
+
+        # Crear la respuesta como un archivo PDF
+        response = HttpResponse(content_type='application/pdf')
+        filename = f'Ficha_{persona.apellidos_nombres}.pdf'.replace(" ", "_")  # Reemplaza espacios por guiones bajos
+        filename = urllib.parse.quote(filename)  # Codifica caracteres especiales
+
+        response['Content-Disposition'] = f'attachment; filename={filename}'
+        # Crear el PDF
+        p = canvas.Canvas(response, pagesize=letter)
+        # Dibujar el logo en la esquina superior derecha
+        draw_logo(p, "egatur_logo.png")
 
 
-def ficha_ingreso_view(request):
+        # Título
+        p.setFont("Helvetica-Bold", 16)
+        draw_centered_text(p, "FICHA DE INGRESO DE PERSONAL", 740)
+        # Posición inicial para el contenido
+        y_position = 700
+
+        # Sección I - Datos del Trabajador
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(100, y_position, "I. DATOS DEL TRABAJADOR")
+        y_position -= 20  # Ajustar la posición después del título de la sección
+
+        y_position = draw_label_value(p, "Nº DE DNI :", persona.dni or "-", y_position)
+        y_position = draw_label_value(p, "APELLIDOS Y NOMBRES:", persona.apellidos_nombres or "-", y_position)
+        y_position = draw_label_value(p, "FECHA DE NACIMIENTO:", persona.fecha_nacimiento.strftime('%d/%m/%Y') if persona.fecha_nacimiento else "-", y_position)
+        y_position = draw_label_value(p, "Nº DE CELULAR:", persona.celular or "-", y_position)
+        y_position = draw_label_value(p, "CORREO ELECTRÓNICO:", persona.correo_personal or "-", y_position)
+        y_position = draw_label_value(p, "DIRECCION:", persona.direccion or "-", y_position)
+        # Línea de separación
+        draw_line(p, y_position)
+        y_position -= 10
+        # Sección II - Datos Laborales
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(100, y_position, "II. DATOS LABORALES")
+        y_position -= 20  # Ajustar la posición después del título de la sección
+        y_position = draw_label_value(p, "PERIODO DE INICIO:", persona.periodo_inicio.strftime('%d/%m/%Y') if persona.periodo_inicio else "-", y_position)
+        y_position = draw_label_value(p, "PERIODO DE FIN:", persona.periodo_fin.strftime('%d/%m/%Y') if persona.periodo_fin else "-", y_position)
+        y_position = draw_label_value(p, "TIPO DE TRABAJADOR:", persona.tipo_trabajador or "-", y_position)
+        y_position = draw_label_value(p, "TIPO DE CONTRATO:", persona.tipo_contrato or "-", y_position)
+        y_position = draw_label_value(p, "TIPO DE PAGO:", persona.tipo_pago or "-", y_position)
+        # NUEVA LÍNEA: PERIODICIDAD DE INGRESO
+        y_position = draw_label_value(p, "PERIODICIDAD DE INGRESO:", "MENSUAL", y_position)
+
+        # NUEVA LÍNEA: REMUNERACIÓN
+        y_position = draw_label_value(p, "REMUNERACIÓN:", f"S/. {persona.remuneracion:.2f}" if persona.remuneracion else "S/. 0.00", y_position)
+
+        y_position = draw_label_value(p, "ASIGNACIÓN FAMILIAR:", "Sí" if persona.asignacion_familiar else "No", y_position)
+
+        # Línea de separación
+        draw_line(p, y_position)
+        y_position -= 10
+
+        # Sección III - Datos de Seguridad Social
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(100, y_position, "III. DATOS DE SEGURIDAD SOCIAL")
+        y_position -= 20
+
+        y_position = draw_label_value(p, "RÉGIMEN DE SALUD:", (persona.regimen_salud or "-").upper(), y_position)
+        # RÉGIMEN PENSIONARIO Y SUS DETALLES EN LA MISMA LÍNEA
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(100, y_position, "RÉGIMEN PENSIONARIO:")
+
+        p.setFont("Helvetica", 10)
+        p.drawString(280, y_position, (persona.regimen_pensionario or "-").upper())
+
+        # Agregar DETALLES RÉGIMEN PENSIONARIO al costado
+        p.setFont("Helvetica-Bold", 10)
+        p.drawString(400, y_position, "DETALLES:")
+
+        p.setFont("Helvetica", 10)
+        p.drawString(460, y_position, persona.regimen_pensionario_details or "-")
+        # Línea de separación
+        draw_line(p, y_position-13)
+        y_position -= 20
+
+        # Sección IV - Datos de la Situación Educativa
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(100, y_position, "IV. DATOS DE LA SITUACIÓN EDUCATIVA")
+        y_position -= 20
+
+        y_position = draw_label_value(p, "SITUACIÓN EDUCATIVA:", persona.situacion_educativa or "-", y_position)
+        y_position = draw_label_value(p, "TIPO DE INSTRUCCIÓN:", persona.tipo_instruccion or "-", y_position)
+        y_position = draw_label_value(p, "INSTITUCIÓN:", persona.institucion or "-", y_position)
+        y_position = draw_label_value(p, "CARRERA DE ESTUDIO:", persona.carrera_estudio or "-", y_position)
+        y_position = draw_label_value(p, "AÑO DE EGRESO:", persona.ano_egreso or "-", y_position)
+
+        # Agregar líneas para firma al final del PDF
+        y_position -= 40  # Espacio antes de las firmas
+
+        # Línea izquierda (firma vacía)
+        p.line(100, y_position, 300, y_position)  # Línea
+        # Línea derecha (Firma del trabajador)
+        p.line(350, y_position, 550, y_position)
+
+        # Nombre del trabajador a la derecha
+        p.setFont("Helvetica", 10)
+        p.drawString(380, y_position - 15, persona.apellidos_nombres)
+        # Finalizar el PDF
+        p.showPage()
+        p.save()
+
+        return response
+    except Exception as e:
+        messages.error(request, f"Error al generar el PDF: {str(e)}")
+        return redirect("ver_personal")
+
+
+def draw_label_value(p, label, value, y_position):
+    p.setFont("Helvetica-Bold", 10)
+    p.drawString(100, y_position, label)  # Escribir la etiqueta en su posición
+
+    p.setFont("Helvetica", 10)
+    x_position = 280  # Aumentamos la posición X para dar más espacio a la etiqueta
+    p.drawString(x_position, y_position, value)  # Escribir el valor más a la derecha
+
+    y_position -= 20  # Bajar la posición para la siguiente línea
+
+    return y_position
+
+
+def draw_line(p, y_position):
+    p.setStrokeColor(colors.black)
+    p.setLineWidth(1)
+    p.line(100, y_position +8, 500, y_position + 8)
+
+def guardar_datos(request):
     if request.method == "POST":
-        ficha = FichaIngreso(
-            dni=request.POST.get("dni"),
-            nombres=request.POST.get("nombres"),
-            fecha_nacimiento=request.POST.get("fecha_nacimiento"),
-            celular=request.POST.get("celular"),
-            correo_personal=request.POST.get("correo_personal"),
-            correo_corporativo=request.POST.get("correo_corporativo"),
-            direccion=request.POST.get("direccion"),
-            fecha_inicio=request.POST.get("fecha_inicio"),
-            fecha_fin=request.POST.get("fecha_fin"),
-            tipo_trabajador=request.POST.get("tipo_trabajador"),
-            tipo_contrato=request.POST.get("tipo_contrato"),
-            tipo_pago=request.POST.get("tipo_pago"),
-            nombre_cuenta=request.POST.get("nombre_cuenta"),
-            numero_cuenta=request.POST.get("numero_cuenta"),
-            asignacion_familiar=bool(request.POST.get("asignacion_familiar")),
-            regimen_salud=request.POST.get("regimen_salud"),
-            regimen_pensionario=request.POST.get("regimen_pensionario"),
-            situacion_educativa=request.POST.get("situacion_educativa"),
-            tipo_instruccion=request.POST.get("tipo_instruccion"),
-            institucion=request.POST.get("institucion"),
-            carrera=request.POST.get("carrera"),
-            anio_egreso=request.POST.get("anio_egreso"),
-        )
-        ficha.save()
-        messages.success(request, "Ficha guardada correctamente.")
-        return redirect("ficha_ingreso")
+
+        return redirect("ver_personal")
 
     return render(request, "ficha_ingreso.html")
+
+
+
+def guardar_datos_editados(request, id_personal):
+    if request.method == "POST":
+        def get_value(field):
+            """Devuelve un string vacío ("") si el campo está vacío."""
+            value = request.POST.get(field, "").strip()
+            return value if value else ""
+
+        def get_date(field):
+            """Convierte la fecha a formato correcto o devuelve None si está vacía."""
+            date_value = request.POST.get(field, "").strip()
+            try:
+                return datetime.strptime(date_value, "%Y-%m-%d").date() if date_value else None
+            except ValueError:
+                return None  # Evita errores si la fecha no es válida
+
+        ficha = get_object_or_404(Personal, id=id_personal)
+
+        # Actualizar los valores
+        ficha.dni = get_value("dni")
+        ficha.nombres = get_value("nombres")
+        ficha.fecha_nacimiento = get_date("fecha_nacimiento")
+        ficha.celular = get_value("celular")
+        ficha.correo_personal = get_value("correo_personal")
+        ficha.correo_corporativo = get_value("correo_corporativo")
+        ficha.direccion = get_value("direccion")
+        ficha.fecha_inicio = get_date("fecha_inicio")
+        ficha.fecha_fin = get_date("fecha_fin")
+        ficha.tipo_trabajador = get_value("tipo_trabajador")
+        ficha.tipo_contrato = get_value("tipo_contrato")
+        ficha.tipo_pago = get_value("tipo_pago")
+        ficha.asignacion_familiar = bool(request.POST.get("asignacion_familiar"))
+        ficha.regimen_salud = get_value("regimen_salud")
+        ficha.regimen_pensionario = get_value("regimen_pensionario")
+        ficha.regimen_pensionario_details=get_value("regimen_pensionario_details")  # Agregar el campo de detalles
+        ficha.situacion_educativa = get_value("situacion_educativa")
+        ficha.tipo_instruccion = get_value("tipo_instruccion")
+        ficha.institucion = get_value("institucion")
+        ficha.carrera_estudio = get_value("carrera_estudio")
+        ficha.ocupacion = get_value("ocupacion")
+        ficha.remuneracion = get_value("remuneracion")
+        ficha.ano_egreso=get_value("ano_egreso")
+
+        ficha.save()
+        messages.success(request, "Ficha actualizada correctamente.")
+        return redirect("ver_personal")
 
 
 @csrf_exempt
@@ -209,6 +391,168 @@ def reportes(request):
         'conceptos_nivel_2': conceptos_nivel_2,
     })
 
+def convertir_a_float(valor):
+    """Convierte un string con coma o punto decimal a float correctamente."""
+    if isinstance(valor, str):
+        valor = valor.replace(',', '.')  # Reemplazar coma por punto
+    try:
+        return float(valor)
+    except ValueError:
+        return 0.00  # Si hay error, devolver 0.00
+
+@login_required  # Asegurar que el usuario esté autenticado
+def generar_reporte_diario(request):
+    if not hasattr(request, "user") or not request.user.is_authenticated:
+        return HttpResponse("Error: Usuario no autenticado", status=403)
+
+    hoy = date.today()
+
+    # Obtener el saldo inicial desde la URL y convertirlo
+    saldo_inicial_str = request.GET.get('saldo_inicial', '0.00')
+    saldo_inicial = convertir_a_float(saldo_inicial_str)
+
+    # Filtrar ingresos y gastos del usuario actual y de hoy
+    ingresos = Ingreso.objects.filter(usuario_creador=request.user, fecha_ingreso=hoy)
+    gastos = Gasto.objects.filter(usuario_creador=request.user, fecha_gasto=hoy)
+
+    # Calcular totales asegurando que los valores sean floats
+    total_ingresos = sum(convertir_a_float(i.importe) for i in ingresos)
+    total_gastos = sum(convertir_a_float(g.importe) for g in gastos)
+
+    # Crear el archivo Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reporte Diario"
+
+    # Estilos
+    bold_font = Font(bold=True)
+    center_alignment = Alignment(horizontal="center", vertical="center")
+
+    # Encabezado
+    ws.append(["REPORTE DIARIO"])
+    ws.append([f"Fecha: {hoy.strftime('%d de %B de %Y')}"])
+
+    ws.append([])
+    ws.append(["I. SALDO DE APERTURA DE CAJA"])
+    ws.append([f"{saldo_inicial:.2f}"])  # Se coloca el saldo inicial con dos decimales
+
+    # Sección II: Recepción de Efectivo
+    ws.append([])
+    ws.append(["II. RECEPCIÓN DE EFECTIVO"])
+    ws.append(["ID", "Fecha", "Comentario", "Monto"])
+
+    # Aplicar negrita a los encabezados de la tabla
+    for col in range(1, 5):
+        cell = ws.cell(row=ws.max_row, column=col)
+        cell.font = bold_font
+        cell.alignment = center_alignment
+
+    # Agregar los ingresos a la tabla con el formato correcto
+    for ingreso in ingresos:
+        monto_formateado = f"{convertir_a_float(ingreso.importe):.2f}"  # Formatear monto correctamente
+        ws.append([ingreso.id, ingreso.fecha_ingreso, ingreso.observacion or "", monto_formateado])
+
+    # Agregar una fila vacía y luego el total de ingresos
+    ws.append([])
+    ws.append(["TOTAL INGRESOS", "", "", f"{total_ingresos:.2f}"])
+
+    # Aplicar negrita al total de ingresos
+    for cell in ws[ws.max_row]:
+        cell.font = bold_font
+        cell.alignment = center_alignment
+
+    # Sección III: Gastos
+    ws.append([])
+    ws.append(["III. GASTOS"])
+    ws.append(["Total Gastos", f"{total_gastos:.2f}"])
+
+    # Aplicar negrita a los subtítulos de la sección de gastos
+    for cell in ws["A"]:
+        cell.font = bold_font
+
+    # Crear respuesta HTTP con el archivo Excel
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f'attachment; filename="Reporte_Diario_{hoy}.xlsx"'
+    wb.save(response)
+
+    return response
+
+def reporte_mensual(request):
+    if request.method == "POST":
+        mes_numero = request.POST.get("mes")
+        if not mes_numero:
+            return HttpResponse("Debe seleccionar un mes.", status=400)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"Reporte Mensual - {mes_numero}"
+
+        # Estilos
+        bold_font = Font(bold=True)
+        bold_gray_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+
+        # Encabezado
+        ws.append(["Concepto", "Total"])
+        for cell in ws[1]:
+            cell.font = bold_font
+
+        # Variable para el total general de los conceptos nivel 1
+        total_general = 0
+        row = 2
+
+        # Conceptos de nivel 1
+        conceptos_nivel_1 = Concepto.objects.filter(nivel=1)
+        for concepto1 in conceptos_nivel_1:
+            total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_1=concepto1)
+                         .aggregate(total=Sum('importe'))['total'] or 0) \
+                      + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_1=concepto1)
+                         .aggregate(total=Sum('importe'))['total'] or 0)
+
+            total_general += total_mes  # Solo sumar los totales de nivel 1
+            ws.append([concepto1.concepto_nombre, total_mes])
+            for cell in ws[row]:
+                cell.font = bold_font
+            ws[row - 1][0].fill = bold_gray_fill
+            row += 1
+
+            # Conceptos de nivel 2
+            conceptos_nivel_2 = Concepto.objects.filter(id_concepto_padre=concepto1)
+            for concepto2 in conceptos_nivel_2:
+                total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_2=concepto2)
+                             .aggregate(total=Sum('importe'))['total'] or 0) \
+                          + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_2=concepto2)
+                             .aggregate(total=Sum('importe'))['total'] or 0)
+
+                ws.append(["   " + concepto2.concepto_nombre, total_mes])
+                ws[row - 1][0].font = bold_font
+                row += 1
+
+                # Conceptos de nivel 3
+                conceptos_nivel_3 = Concepto.objects.filter(id_concepto_padre=concepto2)
+                for concepto3 in conceptos_nivel_3:
+                    total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_3=concepto3)
+                                 .aggregate(total=Sum('importe'))['total'] or 0) \
+                              + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_3=concepto3)
+                                 .aggregate(total=Sum('importe'))['total'] or 0)
+
+                    ws.append(["      " + concepto3.concepto_nombre, total_mes])
+                    row += 1
+
+        # Agregar total general solo de los conceptos de nivel 1
+        ws.append(["TOTAL GENERAL", total_general])
+        for cell in ws[row]:
+            cell.font = bold_font
+            cell.fill = bold_gray_fill
+
+        # Generar respuesta HTTP con el archivo Excel
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="Reporte_Mensual_{mes_numero}_{date.today().year}.xlsx"'
+        wb.save(response)
+        return response
+
+    return HttpResponse("Método no permitido", status=405)
 def reporte_anual(request):
     wb = Workbook()
     ws = wb.active
@@ -225,7 +569,7 @@ def reporte_anual(request):
     ]
 
     # Encabezado
-    ws.append(['Concepto'] + meses)
+    ws.append(['Concepto'] + meses + ['Total Anual'])
     for cell in ws[1]:
         cell.font = bold_font
 
@@ -234,15 +578,21 @@ def reporte_anual(request):
     row = 2
     for concepto1 in conceptos_nivel_1:
         valores_mensuales = []
+        total_anual = 0  # Inicializar el total anual
+        total_mes = [0] * 12  # Inicializar la lista para los totales de cada mes
+
         for mes in meses:
             mes_numero = meses.index(mes) + 1
-            total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_1=concepto1)
-                         .aggregate(total=Sum('importe'))['total'] or 0) \
-                      + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_1=concepto1)
-                         .aggregate(total=Sum('importe'))['total'] or 0)
-            valores_mensuales.append(total_mes)
+            total_mes_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_1=concepto1)
+                             .aggregate(total=Sum('importe'))['total'] or 0) \
+                              + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_1=concepto1)
+                             .aggregate(total=Sum('importe'))['total'] or 0)
+            valores_mensuales.append(total_mes_mes)
+            total_anual += total_mes_mes  # Acumular el total anual
+            total_mes[mes_numero - 1] += total_mes_mes  # Acumular total por mes
 
-        ws.append([concepto1.concepto_nombre] + valores_mensuales)
+        # Insertar los datos del concepto de nivel 1
+        ws.append([concepto1.concepto_nombre] + valores_mensuales + [total_anual])
         row += 1
 
         # Aplicar formato de negrita y fondo gris para nivel 1
@@ -254,15 +604,17 @@ def reporte_anual(request):
         conceptos_nivel_2 = Concepto.objects.filter(id_concepto_padre=concepto1)
         for concepto2 in conceptos_nivel_2:
             valores_mensuales = []
+            total_anual = 0  # Inicializar el total anual
             for mes in meses:
                 mes_numero = meses.index(mes) + 1
-                total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_2=concepto2)
-                             .aggregate(total=Sum('importe'))['total'] or 0) \
-                          + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_2=concepto2)
-                             .aggregate(total=Sum('importe'))['total'] or 0)
-                valores_mensuales.append(total_mes)
+                total_mes_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_2=concepto2)
+                                 .aggregate(total=Sum('importe'))['total'] or 0) \
+                                  + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_2=concepto2)
+                                 .aggregate(total=Sum('importe'))['total'] or 0)
+                valores_mensuales.append(total_mes_mes)
+                total_anual += total_mes_mes  # Acumular el total anual
 
-            ws.append(["   " + concepto2.concepto_nombre] + valores_mensuales)
+            ws.append(["   " + concepto2.concepto_nombre] + valores_mensuales + [total_anual])
             row += 1
 
             # Aplicar formato de negrita para nivel 2
@@ -272,22 +624,33 @@ def reporte_anual(request):
             conceptos_nivel_3 = Concepto.objects.filter(id_concepto_padre=concepto2)
             for concepto3 in conceptos_nivel_3:
                 valores_mensuales = []
+                total_anual = 0  # Inicializar el total anual
                 for mes in meses:
                     mes_numero = meses.index(mes) + 1
-                    total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_3=concepto3)
-                                 .aggregate(total=Sum('importe'))['total'] or 0) \
-                              + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_3=concepto3)
-                                 .aggregate(total=Sum('importe'))['total'] or 0)
-                    valores_mensuales.append(total_mes)
+                    total_mes_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_3=concepto3)
+                                     .aggregate(total=Sum('importe'))['total'] or 0) \
+                                      + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_3=concepto3)
+                                     .aggregate(total=Sum('importe'))['total'] or 0)
+                    valores_mensuales.append(total_mes_mes)
+                    total_anual += total_mes_mes  # Acumular el total anual
 
-                ws.append(["      " + concepto3.concepto_nombre] + valores_mensuales)
+                ws.append(["      " + concepto3.concepto_nombre] + valores_mensuales + [total_anual])
                 row += 1
+
+        # Agregar el total de la suma por cada mes de los conceptos de nivel 1
+        ws.append(['Total por Mes'] + total_mes + [sum(total_mes)])
+        for cell in ws[row]:
+            cell.font = bold_font
+        ws[row][0].fill = bold_gray_fill
 
     # Generar respuesta HTTP para la descarga del archivo
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="Reporte_Anual_{date.today().year}.xlsx"'
     wb.save(response)
     return response
+
+
+@login_required
 def ver_personal(request):
     # Obtener todos los registros del modelo Personal
     personal = Personal.objects.all()
@@ -295,39 +658,76 @@ def ver_personal(request):
     return render(request, 'ver_personal.html', {'personal': personal})
 
 
-
-
-def guardar_datos(request):
+def guardar_datos1(request):
     if request.method == 'POST':
+        # Funciones para manejar los valores y las fechas
+        def get_value(field):
+            """Devuelve un string vacío ("") si el campo está vacío."""
+            value = request.POST.get(field, "").strip()
+            return value if value else ""
+
+        def get_date(field):
+            """Convierte la fecha a formato correcto o devuelve None si está vacía."""
+            date_value = request.POST.get(field, "").strip()
+            try:
+                return datetime.strptime(date_value, "%Y-%m-%d").date() if date_value else None
+            except ValueError:
+                return None  # Evita errores si la fecha no es válida
+
+        # Verificar si ya existe un proveedor con el mismo DNI
+        if Proveedor.objects.filter(ruc_dni=request.POST['dni']).exists():
+            return JsonResponse({'error': 'Ya existe un proveedor con ese DNI. Elimine el proveedor antes de continuar.'}, status=400)
+
+        # Guardar los datos del Personal
         personal = Personal(
-            dni=request.POST['dni'],
-            apellidos_nombres=request.POST['apellidos_nombres'],
-            fecha_nacimiento=request.POST['fecha_nacimiento'],
-            celular=request.POST['celular'],
-            correo_personal=request.POST['correo_personal'],
-            correo_corporativo=request.POST['correo_corporativo'],
-            direccion=request.POST['direccion'],
-            periodo_inicio=request.POST['periodo_inicio'],
-            periodo_fin=request.POST['periodo_fin'],
-            tipo_trabajador=request.POST['tipo_trabajador'],
-            tipo_contrato=request.POST['tipo_contrato'],
-            tipo_pago=request.POST['tipo_pago'],
-            nombre_cuenta=request.POST['nombre_cuenta'],
-            numero_cuenta=request.POST['numero_cuenta'],
+            dni=get_value('dni'),
+            apellidos_nombres=get_value('apellidos_nombres'),
+            fecha_nacimiento=get_date('fecha_nacimiento'),
+            celular=get_value('celular'),
+            correo_personal=get_value('correo_personal'),
+            correo_corporativo=get_value('correo_corporativo'),
+            direccion=get_value('direccion'),
+            periodo_inicio=get_date('periodo_inicio'),
+            periodo_fin=get_date('periodo_fin'),
+            tipo_trabajador=get_value('tipo_trabajador'),
+            tipo_contrato=get_value('tipo_contrato'),
+            tipo_pago=get_value('tipo_pago'),
+            nombre_cuenta=get_value('nombre_cuenta'),
+            numero_cuenta=get_value('numero_cuenta'),
             asignacion_familiar=request.POST.get('asignacion_familiar') == 'on',
-            ocupacion=request.POST['ocupacion'],
-            remuneracion=request.POST['remuneracion'],
-            regimen_salud=request.POST['regimen_salud'],
-            regimen_pensionario=request.POST['regimen_pensionario'],
-            situacion_educativa=request.POST['situacion_educativa'],
-            tipo_instruccion=request.POST['tipo_instruccion'],
-            institucion=request.POST['institucion'],
-            carrera_estudio=request.POST['carrera_estudio'],
-            ano_egreso=request.POST['ano_egreso'],
+            ocupacion=get_value('ocupacion'),
+            remuneracion=get_value('remuneracion'),
+            regimen_salud=get_value('regimen_salud'),
+            regimen_pensionario=get_value('regimen_pensionario'),
+            situacion_educativa=get_value('situacion_educativa'),
+            tipo_instruccion=get_value('tipo_instruccion'),
+            institucion=get_value('institucion'),
+            carrera_estudio=get_value('carrera_estudio'),
+            ano_egreso=get_value('ano_egreso'),
+            cci=get_value('cci'),
         )
         personal.save()
-        messages.success(request, 'Datos guardados correctamente.')
-        return redirect('ficha_ingreso')
+
+        # Crear un Proveedor con los datos del Personal
+        proveedor = Proveedor(
+            ruc_dni=personal.dni,  # DNI como RUC_DNI
+            razon_social=personal.apellidos_nombres,  # Apellidos y nombres como razón social
+            telefono=personal.celular,  # Celular como teléfono
+            nombre_contacto=""  # Nombre de contacto vacío
+        )
+        proveedor.save()  # Guardar el proveedor
+        # Crear una cuenta bancaria asociada al proveedor
+        cuenta_bancaria = CuentaBancaria(
+            proveedor=proveedor,
+            nombre_banco=personal.nombre_cuenta,  # Se iguala a nombre_cuenta del personal
+            numero_cuenta=personal.numero_cuenta,  # Se iguala a numero_cuenta del personal
+            cci=personal.cci  # Se iguala a cci del personal
+        )
+        cuenta_bancaria.save()  # Guardar la cuenta bancaria
+        # Respuesta de éxito en formato JSON
+        return JsonResponse({'success': 'Datos guardados correctamente y proveedor creado.'}, status=200)
+
+
 def generar_reporte_json(request):
     try:
         if request.method == 'GET':
@@ -344,35 +744,42 @@ def generar_reporte_json(request):
             except ValueError:
                 return JsonResponse({'error': 'Las fechas proporcionadas no tienen el formato correcto (YYYY-MM-DD).'}, status=400)
 
-            # Filtrar los gastos según los parámetros
+            # Filtrar gastos y rendiciones según los parámetros
             gastos = Gasto.objects.filter(fecha_gasto__gte=fecha_inicio_dt, fecha_gasto__lte=fecha_final_dt)
+            rendiciones = Rendicion.objects.filter(fecha_operacion__gte=fecha_inicio_dt, fecha_operacion__lte=fecha_final_dt)
 
             if concepto_nivel_1 != 'todos':
                 gastos = gastos.filter(concepto_nivel_1=concepto_nivel_1)
+                rendiciones = rendiciones.filter(concepto_nivel_1=concepto_nivel_1)
             if concepto_nivel_2 != 'todos':
                 gastos = gastos.filter(concepto_nivel_2=concepto_nivel_2)
+                rendiciones = rendiciones.filter(concepto_nivel_2=concepto_nivel_2)
 
-            # Verificar si hay gastos para mostrar
-            if not gastos.exists():
-                return JsonResponse({'error': 'No se encontraron gastos con los parámetros seleccionados'}, status=404)
+            # Verificar si hay datos para mostrar
+            if not gastos.exists() and not rendiciones.exists():
+                return JsonResponse({'error': 'No se encontraron registros con los parámetros seleccionados'}, status=404)
 
-            # Agrupar los gastos por concepto_nivel_2
-            grouped_gastos = {}
+            # Agrupar gastos y rendiciones por concepto_nivel_2
+            grouped_data = {}
             total_importe = 0
 
-            for gasto in gastos:
-                concepto_2 = gasto.concepto_nivel_2.concepto_nombre if gasto.concepto_nivel_2 else "Sin Nivel 2"
-                if concepto_2 not in grouped_gastos:
-                    grouped_gastos[concepto_2] = []
+            for item in list(gastos) + list(rendiciones):
+                concepto_2 = item.concepto_nivel_2.concepto_nombre if item.concepto_nivel_2 else "Sin Nivel 2"
+                if concepto_2 not in grouped_data:
+                    grouped_data[concepto_2] = []
 
-                grouped_gastos[concepto_2].append({
-                    'proveedor': gasto.nombre_proveedor.nombre_comercial or gasto.nombre_proveedor.razon_social,
-                    'concepto': gasto.concepto_nivel_1.concepto_nombre,
-                    'forma_pago': gasto.tipo_pago,
-                    'importe': gasto.importe,
-                    'fecha': gasto.fecha_gasto.strftime("%d/%m/%Y") if gasto.fecha_gasto else 'Sin Fecha',
+                grouped_data[concepto_2].append({
+                    'proveedor': item.nombre_proveedor.razon_social if hasattr(item, 'nombre_proveedor') and item.nombre_proveedor else (
+                        item.proveedor.razon_social if hasattr(item, 'proveedor') and item.proveedor else 'Sin proveedor'
+                    ),
+                    'concepto': item.concepto_nivel_1.concepto_nombre if item.concepto_nivel_1 else 'Sin concepto',
+                    'forma_pago': item.tipo_comprobante,
+                    'importe': item.importe,
+                    'fecha': item.fecha_gasto.strftime("%d/%m/%Y") if hasattr(item, 'fecha_gasto') and item.fecha_gasto else (
+                        item.fecha_operacion.strftime("%d/%m/%Y") if item.fecha_operacion else 'Sin Fecha'
+                    ),
                 })
-                total_importe += gasto.importe
+                total_importe += item.importe if item.importe else 0
 
             # Generar la fecha actual para el reporte
             fecha_actual = datetime.now().strftime("%d/%m/%Y")
@@ -381,8 +788,8 @@ def generar_reporte_json(request):
             response_data = {
                 'fecha': fecha_actual,
                 'gastos_por_grupo': [
-                    {'nivel_2': nivel_2, 'gastos': gastos_data}
-                    for nivel_2, gastos_data in grouped_gastos.items()
+                    {'nivel_2': nivel_2, 'gastos': data}
+                    for nivel_2, data in grouped_data.items()
                 ],
                 'total_importe': total_importe
             }
@@ -392,6 +799,7 @@ def generar_reporte_json(request):
     except Exception as e:
         # Si ocurre un error, captura la excepción y retorna un error 500 con detalles
         return JsonResponse({'error': f'Ocurrió un error al generar el reporte: {str(e)}'}, status=500)
+
 
 
 def guardar_proveedor(request):
@@ -516,9 +924,7 @@ def registrar_rendiciones(request, gasto_id):
 
 
 
-from datetime import date
-from decimal import Decimal
-from django.shortcuts import render
+
 
 def obtener_saldo_inicial_manual(fecha_inicio, usuario=None):
     dias_busqueda = 5  # Máximo de días para retroceder
@@ -573,29 +979,19 @@ def actualizar_movimiento(request):
 
 def descargar_excel(request):
     hoy = date.today().strftime('%Y-%m-%d')  # Formato para los campos de tipo date
-
-    # Obtener las fechas de los parámetros GET, si no están presentes usar la fecha de hoy
     fecha_inicio = request.GET.get('fecha_inicio', hoy)
     fecha_fin = request.GET.get('fecha_fin', hoy)
-
-    # Convertir las fechas a tipo date
     fecha_inicio = date.fromisoformat(fecha_inicio)
     fecha_fin = date.fromisoformat(fecha_fin)
-
-    # Calcular el saldo base según el username del usuario autenticado
     saldo_base = Decimal(0)
     try:
         saldo_inicial = SaldoInicial.objects.get(usuario=request.user)
         saldo_base = saldo_inicial.monto_saldo_inicial
     except SaldoInicial.DoesNotExist:
         saldo_base = Decimal('0.00')  # Si no tiene saldo inicial, asignar 0
-
-    # Calcular el saldo inicial usando la función personalizada
     saldo_inicial = obtener_saldo_inicial_manual(fecha_inicio, usuario=request.user if not request.user.is_staff else None)
     # Sumar el saldo base al saldo inicial
     saldo_inicial += saldo_base
-
-    # Verificar si el usuario es staff
     if request.user.is_staff:
         # Staff puede ver todos los ingresos y gastos
         ingresos = Ingreso.objects.filter(
@@ -613,11 +1009,7 @@ def descargar_excel(request):
             fecha_gasto__range=[fecha_inicio, fecha_fin],
             usuario_creador=request.user
         )
-
-    # Preparar los movimientos para la tabla
     movimientos = []
-
-    # Procesar ingresos
     for ingreso in ingresos:
         nombre_fondo = ingreso.id_fondo.nombre_fondo if ingreso.id_fondo else 'Sin nombre'
         tipo = 'Extorno' if ingreso.extorno else 'Ingreso'
@@ -637,8 +1029,6 @@ def descargar_excel(request):
             'notas': ingreso.observacion or '',
             'monto': Decimal(ingreso.importe)
         })
-
-    # Procesar gastos
     for gasto in gastos:
         if gasto.concepto_nivel_3:
             concepto = gasto.concepto_nivel_3.concepto_nombre
@@ -651,11 +1041,9 @@ def descargar_excel(request):
                 concepto = f"REQ N°{gasto.num_requerimiento} (Id={gasto.id_requerimiento})"
             else:
                 concepto = gasto.tipo_comprobante or ''
-
         banco_nombre = gasto.banco.nombre if gasto.banco else ''
         codigo_operacion = gasto.codigo_operacion or ''
         fecha_operacion = gasto.fecha_operacion.strftime('%d/%m/%Y') if gasto.fecha_operacion else ''
-
         movimientos.append({
             'tipo': 'Gasto',
             'fecha': gasto.fecha_gasto.strftime('%-d/%-m/%Y'),
@@ -668,33 +1056,19 @@ def descargar_excel(request):
             'notas': gasto.observacion or '',
             'monto': Decimal(gasto.importe)
         })
-
-    # Crear la respuesta HTTP para descargar el archivo Excel
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="movimientos_{fecha_inicio}_a_{fecha_fin}.xlsx"'
-
-    # Crear el archivo Excel y agregar datos
     wb = Workbook()
     ws = wb.active
-
-    # Escribir el título en negrita
     titulo = f"Movimientos de {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
     ws.append([titulo])
     ws.append([])  # Línea vacía
-
-    # Escribir el saldo inicial antes de la tabla
     ws.append([f'Saldo inicial: {saldo_inicial:,.2f}'])
     ws.append([])  # Línea vacía
-
-    # Definir los encabezados
     encabezados = ['Tipo', 'Fecha', 'Método de Pago', 'Concepto', 'Proveedor', 'Banco', 'Código de Operación', 'Fecha de Operación', 'Monto', 'Notas']
-
-    # Escribir encabezados en la primera fila (negrita), empezando desde la columna A
     for col_num, header in enumerate(encabezados, 1):  # Comienza en la columna A
         cell = ws.cell(row=5, column=col_num, value=header)
         cell.font = Font(bold=True)
-
-    # Escribir los movimientos en las filas siguientes
     row_num = 6
     for movimiento in movimientos:
         ws.cell(row=row_num, column=1, value=movimiento['tipo'])
@@ -708,12 +1082,10 @@ def descargar_excel(request):
         ws.cell(row=row_num, column=9, value=movimiento['monto'])
         ws.cell(row=row_num, column=10, value=movimiento['notas'])
         row_num += 1
-
-    # Escribir el saldo final en la fila siguiente después de los movimientos
     ws.append([])  # Línea vacía
-    ws.append([f'Saldo final: {saldo_inicial + sum([m["monto"] for m in movimientos]):,.2f}'])
+    saldo_final = saldo_inicial + sum(m["monto"] for m in movimientos if m["tipo"] in ["Ingreso", "Extorno"]) - sum(m["monto"] for m in movimientos if m["tipo"] == "Gasto")
+    ws.append([f'Saldo final: {saldo_final:,.2f}'])
 
-    # Ajustar el ancho de las columnas
     for col in range(1, 11):  # Ajustamos para que empiece en la columna A
         max_length = 0
         for row in ws.iter_rows(min_col=col, max_col=col):
@@ -725,8 +1097,6 @@ def descargar_excel(request):
                     pass
         adjusted_width = (max_length + 2)
         ws.column_dimensions[chr(64 + col)].width = adjusted_width
-
-    # Guardar el archivo
     wb.save(response)
     return response
 
@@ -797,7 +1167,7 @@ def caja_chica(request):
             'tipo': tipo,
             'fecha': ingreso.fecha_ingreso.strftime('%-d/%-m/%Y'),
             'metodo_pago': ingreso.metodo_pago,
-            'concepto': nombre_fondo,
+            'concepto': ingreso.local.nombre_local if ingreso.local else "sin local asignado",
             'notas': ingreso.observacion or '',
             'monto': Decimal(ingreso.importe),
             'moneda': ingreso.moneda,
@@ -818,6 +1188,7 @@ def caja_chica(request):
                 concepto = f"REQ N°{gasto.num_requerimiento} (Id={gasto.id_requerimiento})"
             else:
                 concepto = gasto.tipo_comprobante or ''
+        total_rendido = sum(rendicion.importe for rendicion in gasto.rendiciones_gasto.all())
 
         movimientos.append({
             'id': gasto.id,
@@ -831,6 +1202,7 @@ def caja_chica(request):
             'moneda': gasto.moneda,
             'proveedor': gasto.nombre_proveedor.razon_social,
             'rendiciones': list(gasto.rendiciones_gasto.all()),
+            'total_rendido': total_rendido,  # ✅ Agregar el total de rendiciones
             'usuario_creador': gasto.usuario_creador.username
         })
 
@@ -1015,6 +1387,7 @@ def registrar_gasto(request, id):
             return redirect('gasto_edit', id=id)  # Redirige al formulario original en caso de error
 
     return redirect('gasto_edit', id=id)
+
 def gasto_edit(request, id):
     gasto = get_object_or_404(Gasto, id=id)
 
@@ -1128,6 +1501,7 @@ def guardar_oficial(request):
                     nombre_proveedor=gasto.nombre_proveedor,
                     local=gasto.local,
                     tipo_pago="efectivo",
+                    gasto_origen=gasto,  # Vincular con el gasto original
 
 
                 )
@@ -1146,7 +1520,9 @@ def guardar_oficial(request):
                     metodo_pago="Sin especificar",
                     moneda=gasto.moneda,  # Moneda por defecto del gasto asociado
                     extorno=True,
-                    observacion="gasto extra generado"
+                    observacion="gasto extra generado",
+                    gasto_origen=gasto  # Vincular con el gasto original
+
                 )
                 nuevo_ingreso.usuario_creador=request.user
                 nuevo_ingreso.save()
@@ -1201,17 +1577,29 @@ from django.http import JsonResponse
 from django.db.models import Value
 from django.db.models.functions import Coalesce
 
-def calcular_gastos_por_metodo_pago():
+def calcular_gastos_por_metodo_pago(usuario):
     """
     Calcula la suma de los gastos agrupados por método de pago.
     Retorna un diccionario con etiquetas (métodos de pago) y valores (totales).
+    Si el usuario es staff, se mostrarán todos los gastos.
     """
-    gastos_por_metodo = (
-        Gasto.objects
-        .values('tipo_pago')
-        .annotate(total_gasto=Sum('importe'))
-        .order_by('-total_gasto')
-    )
+    # Si el usuario es staff, no filtramos por usuario_creador
+    if usuario.is_staff:
+        gastos_por_metodo = (
+            Gasto.objects
+            .values('tipo_pago')
+            .annotate(total_gasto=Sum('importe'))
+            .order_by('-total_gasto')
+        )
+    else:
+        # Si no es staff, filtramos por usuario_creador
+        gastos_por_metodo = (
+            Gasto.objects
+            .filter(usuario_creador=usuario)
+            .values('tipo_pago')
+            .annotate(total_gasto=Sum('importe'))
+            .order_by('-total_gasto')
+        )
 
     # Preparar datos para el gráfico
     etiquetas = [gasto['tipo_pago'] or 'Sin especificar' for gasto in gastos_por_metodo]
@@ -1230,9 +1618,20 @@ def dashboard_view(request):
         current_year = today.year
         current_month = today.month
 
-        # Obtener los 5 conceptos con más gasto
+        # Si el usuario es staff, no filtramos los gastos por usuario_creador
+        if request.user.is_staff:
+            # Si es staff, no filtramos los gastos por usuario logueado
+            gastos_filter = Gasto.objects
+        else:
+            # Si no es staff, filtramos los gastos por usuario_creador
+            gastos_filter = Gasto.objects.filter(usuario_creador=request.user)
+
+        # Los ingresos siempre se filtran por el usuario logueado, sin importar si es staff
+        ingresos_filter = Ingreso.objects.filter(usuario_creador=request.user)
+
+        # Obtener los 5 conceptos con más gasto (filtrar solo por los gastos, y si es staff ver todos)
         top_conceptos = (
-            Gasto.objects
+            gastos_filter
             .annotate(concepto_nombre=Coalesce(
                 'concepto_nivel_3__concepto_nombre',
                 'concepto_nivel_2__concepto_nombre',
@@ -1248,19 +1647,29 @@ def dashboard_view(request):
         conceptos_labels = [entry['concepto_nombre'] for entry in top_conceptos]
         conceptos_data = [float(entry['total_gasto']) for entry in top_conceptos]
 
-        # Obtener ingresos por mes para el gráfico de barras (solo mes actual)
-        ingresos_mes_actual = Ingreso.objects.filter(fecha_ingreso__year=current_year, fecha_ingreso__month=current_month)
+        # Obtener ingresos por mes para el gráfico de barras (solo mes actual) filtrado por usuario
+        ingresos_mes_actual = ingresos_filter.filter(
+            fecha_ingreso__year=current_year,
+            fecha_ingreso__month=current_month
+        )
         ingresos_mes_actual_total = ingresos_mes_actual.aggregate(total_ingresos=Sum('importe'))['total_ingresos'] or Decimal('0.00')
 
-        # Obtener gastos por mes para el gráfico de barras (solo mes actual)
-        gastos_mes_actual = Gasto.objects.filter(fecha_gasto__year=current_year, fecha_gasto__month=current_month)
+        # Obtener gastos por mes para el gráfico de barras (solo mes actual) filtrado por usuario o todos si es staff
+        gastos_mes_actual = gastos_filter.filter(
+            fecha_gasto__year=current_year,
+            fecha_gasto__month=current_month
+        )
         gastos_mes_actual_total = gastos_mes_actual.aggregate(total_gastos=Sum('importe'))['total_gastos'] or Decimal('0.00')
 
-        # Obtener ingresos por mes para el gráfico de líneas (todo el año actual)
-        ingresos_anuales = Ingreso.objects.filter(fecha_ingreso__year=current_year).annotate(month=TruncMonth('fecha_ingreso')).values('month').annotate(total_ingresos=Sum('importe')).order_by('month')
+        # Obtener ingresos por mes para el gráfico de líneas (todo el año actual) filtrado por usuario
+        ingresos_anuales = ingresos_filter.filter(
+            fecha_ingreso__year=current_year
+        ).annotate(month=TruncMonth('fecha_ingreso')).values('month').annotate(total_ingresos=Sum('importe')).order_by('month')
 
-        # Obtener gastos por mes para el gráfico de líneas (todo el año actual)
-        gastos_anuales = Gasto.objects.filter(fecha_gasto__year=current_year).annotate(month=TruncMonth('fecha_gasto')).values('month').annotate(total_gastos=Sum('importe')).order_by('month')
+        # Obtener gastos por mes para el gráfico de líneas (todo el año actual) filtrado por usuario o todos si es staff
+        gastos_anuales = gastos_filter.filter(
+            fecha_gasto__year=current_year
+        ).annotate(month=TruncMonth('fecha_gasto')).values('month').annotate(total_gastos=Sum('importe')).order_by('month')
 
         # Formatear los resultados para que sean más fáciles de usar en los gráficos
         ingresos_data = {entry['month'].strftime('%B %Y'): float(entry['total_ingresos'] or 0) for entry in ingresos_anuales}
@@ -1275,8 +1684,9 @@ def dashboard_view(request):
         labels_bar = [today.strftime('%B %Y')]  # Solo el mes actual
         ingresos_por_mes_bar = [float(ingresos_mes_actual_total)]
         gastos_por_mes_bar = [float(gastos_mes_actual_total)]
-        datos_gastos_metodo_pago = calcular_gastos_por_metodo_pago()
 
+        # Llamar a la función para calcular los gastos por método de pago (también filtrados por usuario)
+        datos_gastos_metodo_pago = calcular_gastos_por_metodo_pago(request.user)
 
         # Enviar los datos a la plantilla
         data = {
@@ -1289,12 +1699,16 @@ def dashboard_view(request):
             'conceptos_labels': conceptos_labels,
             'conceptos_data': conceptos_data,
             'datos_gastos_metodo_pago': datos_gastos_metodo_pago,
-
         }
 
         return render(request, 'dashboard.html', data)
     else:
         return redirect('login')
+
+
+
+
+
 @login_required
 def agregar_banco(request):
     if request.method == 'POST':
@@ -1704,6 +2118,9 @@ def ver_prestamos(request):
         })
 
     return render(request, 'ver_prestamos.html', {'prestamos_data': prestamos_data})
+def ficha_ingreso_view(request):
+
+    return render(request, "ficha_ingreso.html")
 
 def realizar_pago(request):
     if request.method == 'POST':
@@ -1784,7 +2201,7 @@ def get_nivel_3_conceptos(request):
 
 
 from django.shortcuts import get_object_or_404
-
+@login_required
 def rendicion(request):
     # Obtener la fecha actual
     today = date.today().isoformat()
@@ -1794,8 +2211,9 @@ def rendicion(request):
         usuarios_inactivos = User.objects.filter(is_active=False)
         # Combinar gastos del superusuario y de usuarios inactivos
         gastos_requerimientos = Gasto.objects.filter(
-        Q(tipo_comprobante="Requerimiento") | Q(tipo_comprobante="Sin Requerimiento"),
-            rendido=False
+            Q(tipo_comprobante="Requerimiento") | Q(tipo_comprobante="Sin Requerimiento"),
+            rendido=False,
+            gasto_origen__isnull=True  # Filtrar por gasto_origen nulo
         ).filter(
             usuario_creador__in=[request.user] + list(usuarios_inactivos)
         )
@@ -1804,6 +2222,7 @@ def rendicion(request):
         gastos_requerimientos = Gasto.objects.filter(
             tipo_comprobante="Requerimiento",
             rendido=False,
+            gasto_origen__isnull=True,  # Filtrar por gasto_origen nulo
             usuario_creador=request.user
         )
 

@@ -155,6 +155,7 @@
           <option value="Declaracion">Declaración</option>
           <option value="RHE">RHE</option>
         <option value="Boleta de pago">Boleta de pago</option>
+        <option value="Requerimiento">Requerimiento</option>
 
         </select>
       </td>
@@ -469,7 +470,7 @@ saveButton.addEventListener('click', (e) => {
           </select>
         </td>
         <td class="px-4 py-2"><input type="text" name="rendiciones[${indice}][descripcion]" class="w-full border-gray-300 rounded" placeholder="Descripción" /></td>
-        <td class="px-4 py-2"><input type="text" name="rendiciones[${indice}][numero_requerimiento]" class="w-full border-gray-300 rounded" placeholder="N° de requerimiento" required /></td>
+        <td class="px-4 py-2"><input type="text" name="rendiciones[${indice}][numero_requerimiento]" class="w-full border-gray-300 rounded" placeholder="N° de Comprobante" required /></td>
             <td class="px-4 py-2">
       <select name="rendiciones[${indice}][tipo_requerimiento]" class="w-full border-gray-300 rounded" required>
         <option value="">Seleccione</option>
@@ -479,12 +480,13 @@ saveButton.addEventListener('click', (e) => {
         <option value="Proforma">Proforma</option>
         <option value="Declaracion">Declaración</option>
         <option value="RHE">RHE</option>
+        <option value="Requerimiento">Requerimiento</option>
       </select>
     </td>
         <td class="px-4 py-2"><input type="number" name="rendiciones[${indice}][importe]" step="0.01" class="w-full border-gray-300 rounded importe-field" placeholder="Importe" required /></td>
 
         <td class="px-4 py-2">
-          <select name="rendiciones[${indice}][concepto_nivel_1]" class="w-full border-gray-300 rounded">
+          <select name="rendiciones[${indice}][concepto_nivel_1]" class="w-full border-gray-300 rounded select-concepto-nivel-1">
             <option value="">Seleccione</option>
             {% for concepto in conceptos_nivel_1 %}
             <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
@@ -492,7 +494,7 @@ saveButton.addEventListener('click', (e) => {
           </select>
         </td>
         <td class="px-4 py-2">
-          <select name="rendiciones[${indice}][concepto_nivel_2]" class="w-full border-gray-300 rounded">
+          <select name="rendiciones[${indice}][concepto_nivel_2]" class="w-full border-gray-300 rounded select-concepto-nivel-2">
             <option value="">Seleccione</option>
             {% for concepto in conceptos_nivel_2 %}
             <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
@@ -500,7 +502,7 @@ saveButton.addEventListener('click', (e) => {
           </select>
         </td>
         <td class="px-4 py-2">
-          <select name="rendiciones[${indice}][concepto_nivel_3]" class="w-full border-gray-300 rounded">
+          <select name="rendiciones[${indice}][concepto_nivel_3]" class="w-full border-gray-300 rounded select-concepto-nivel-3">
             <option value="">Seleccione</option>
             {% for concepto in conceptos_nivel_3 %}
             <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
@@ -520,6 +522,10 @@ saveButton.addEventListener('click', (e) => {
         width: '100%',
         placeholder: 'Seleccione un proveedor'
       });
+          $(newRow).find('.select-concepto-nivel-1').select2({ width: '150px' });
+        $(newRow).find('.select-concepto-nivel-2').select2({ width: '150px' });
+        $(newRow).find('.select-concepto-nivel-3').select2({ width: '150px' });
+
       indice++;
     });
 

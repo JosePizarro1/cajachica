@@ -13,8 +13,14 @@
 
 <div class="max-w-6xl mx-auto px-4 py-6">
     <div class="bg-white shadow-lg rounded-lg p-6">
-        <h2 class="text-3xl font-bold text-gray-700 mb-6 text-center">Listado de Personal</h2>
-        
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-bold text-gray-700 text-center flex-1">Listado de Personal</h2>
+            <a href="{% url 'ficha_ingreso' %}"
+               class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-800 transition">
+                <i class="fas fa-user-plus"></i> Agregar Personal
+            </a>
+        </div>
+
         <div class="overflow-x-auto">
             <table id="personalTable" class="w-full border border-gray-200 rounded-lg">
                 <thead class="bg-blue-600 text-white uppercase text-sm">
@@ -23,6 +29,8 @@
                         <th class="py-3 px-4 text-left">Apellidos y Nombres</th>
                         <th class="py-3 px-4 text-left">Correo Personal</th>
                         <th class="py-3 px-4 text-left">Celular</th>
+                        <th class="py-3 px-4 text-left">Periodo Inicio</th>
+                        <th class="py-3 px-4 text-left">Periodo Fin</th>
                         <th class="py-3 px-4 text-center">Acciones</th>
                     </tr>
                 </thead>
@@ -33,24 +41,20 @@
                         <td class="py-3 px-4">{{ persona.apellidos_nombres }}</td>
                         <td class="py-3 px-4">{{ persona.correo_personal }}</td>
                         <td class="py-3 px-4">{{ persona.celular }}</td>
+                        <td class="py-3 px-4">{{ persona.periodo_inicio|default:"-" }}</td>
+                        <td class="py-3 px-4">{{ persona.periodo_fin|default:"-" }}</td>
                         <td class="py-3 px-4 text-center">
                             <!-- Botón de Editar -->
-                            <a href="{% url 'editar_personal' persona.id %}" 
+                            <a href="{% url 'editar_personal' persona.id %}"
                                class="bg-yellow-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-yellow-700 transition">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            
-                            <!-- Botón de Crear Contraseña o Estado -->
-                            {% if persona.contraseña_creada %}
-                                <span class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm">
-                                    <i class="fas fa-lock"></i> Ya Creado
-                                </span>
-                            {% else %}
-                                <button onclick="crearContraseña({{ persona.id }})" 
-                                        class="bg-green-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-700 transition">
-                                    <i class="fas fa-key"></i> Crear Contraseña
-                                </button>
-                            {% endif %}
+
+                                <a href="{% url 'generar_pdf' persona.id %}"
+                                   class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-700 transition"
+                                   target="_blank">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -59,19 +63,23 @@
         </div>
     </div>
 </div>
+
+
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <!-- Inicializar DataTables -->
 <script>
     $(document).ready(function() {
         $('#personalTable').DataTable({
-            "searching": true, // Habilitar la funcionalidad de búsqueda
-            "paging": true,    // Habilitar la paginación
-            "ordering": true,  // Habilitar el ordenamiento de las columnas
-            "info": true, 
+            "searching": true,
+            "paging": true,
+            "ordering": true,
+            "info": true,
         });
     });
-       function crearContraseña(personalId) {
+
+    function crearContraseña(personalId) {
         Swal.fire({
             title: "¿Está seguro?",
             text: "¿Desea generar una nueva contraseña para este usuario?",
@@ -82,12 +90,19 @@
             confirmButtonText: "Sí, crear contraseña"
         }).then((result) => {
             if (result.isConfirmed) {
-                // Aquí puedes redirigir a una vista que genere la contraseña
                 window.location.href = `/crear_contraseña/${personalId}/`;
             }
         });
     }
+        document.querySelector('.bg-red-500').addEventListener('click', function() {
+        // Mostrar mensaje de carga
+        let loadingMessage = document.createElement('div');
+        loadingMessage.classList.add('loading-message');
+        loadingMessage.textContent = 'Generando PDF, por favor espere...';
+        document.body.appendChild(loadingMessage);
+    });
 </script>
+
 <!-- Incluyendo mensajes -->
 {% include 'mensaje.html' %}
 {% endblock %}

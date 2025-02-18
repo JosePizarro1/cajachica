@@ -79,10 +79,13 @@ input[type="date"].dynamic-input {
       <div>
         <label for="id_fondo" class="block text-sm font-medium text-gray-700">Fondo:</label>
         <select id="id_fondo" name="id_fondo" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent" required>
-          {% for fondo in fondos %}
-          <option value="{{ fondo.id }}">{{ fondo.nombre_fondo }}</option>
-          {% endfor %}
+            {% for fondo in fondos %}
+                <option value="{{ fondo.id }}">
+                    {{ fondo.nombre_fondo }}
+                </option>
+            {% endfor %}
         </select>
+
       </div>
 
       <!-- Método de Pago -->
@@ -206,7 +209,19 @@ input[type="date"].dynamic-input {
 
     const btnGuardar = document.getElementById('btn-guardar');
     const formulario = document.getElementById('formulario-ingreso');
+    const selectFondo = document.getElementById("id_fondo");
+    const esStaff = "{{ request.user.is_staff|lower }}" === "true"; // Verifica si el usuario es staff
 
+    if (!esStaff) {
+      for (let option of selectFondo.options) {
+        if (option.text.trim() === "Sin especificar") {
+          option.selected = true;
+          break;
+        }
+      }
+      selectFondo.setAttribute("readonly", true);
+      selectFondo.style.pointerEvents = "none"; // Evita interacción visualmente
+    }
     // Mostrar/Ocultar campo Código de Operacion
     metodoPagoSelect.addEventListener('change', () => {
       if (metodoPagoSelect.value !== 'efectivo') {
