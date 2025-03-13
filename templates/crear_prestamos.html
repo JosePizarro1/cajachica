@@ -75,6 +75,7 @@
                     <div>
                         <label for="estado" class="block text-sm font-medium text-gray-700">Estado</label>
                         <select name="estado" id="estado" class="block w-full px-4 py-2 border rounded-md" required>
+                            <option value="nuevo">Nuevo </option>
                             <option value="proceso">En proceso</option>
                             <option value="terminado">Terminado</option>
                         </select>
@@ -90,7 +91,10 @@
 
                 </div>
 
-
+                <div class="md:col-span-3">
+                    <label for="notas" class="block text-sm font-medium text-gray-700">Notas</label>
+                    <textarea name="notas" id="notas" class="block w-full px-4 py-2 border rounded-md" rows="3"></textarea>
+                </div>
             </div>
 
             <div class="text-center mt-5">

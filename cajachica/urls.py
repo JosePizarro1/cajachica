@@ -8,6 +8,7 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    #path('reiniciar-secuencia/', reiniciar_secuencia, name='reiniciar_secuencia'),
     path('',login_view, name='login'),
     path('dashboard/',dashboard_view, name='dashboard'),
     path('ingreso/', ingreso, name='ingreso'),
@@ -53,8 +54,23 @@ urlpatterns = [
     path('editar-ficha/<int:id_personal>/', guardar_datos_editados, name="guardar_datos_editados"),
     path('reporte-mensual/', reporte_mensual, name='reporte_mensual'),
     path('reporte-diario/', generar_reporte_diario, name='reporte_diario'),
-
+    path('cerrar-caja/', cerrar_caja, name='cerrar_caja'),
+    path("cerrar-caja-usuario/<int:user_id>/", cerrar_caja_usuario, name="cerrar_caja_usuario"),
+    path("reactivar-caja-usuario/<int:user_id>/", reactivar_caja_usuario, name="reactivar_caja_usuario"),
+    path("registrar-usuario/", registrar_usuario, name="registrar_usuario"),
+    path('transferir-yape/', transferir_yape, name='transferir_yape'),
+    path('proveedores/verificar_gastos/<int:proveedor_id>/', verificar_gastos, name='verificar_gastos'),
+    path('reporte_proveedor_pdf/', reporte_proveedor_pdf, name='reporte_proveedor_pdf'),
+    path('reporte_proveedor_excel/', reporte_proveedor_excel, name='reporte_proveedor_excel'),
+    path('trigger-error/', trigger_error, name='trigger_error'),
+    path('eliminar-item/<int:item_id>/<str:item_tipo>/', eliminar_item, name='eliminar_item'),
+    path('reporte-concepto-proveedor-pdf/', reporte_concepto_proveedor_pdf, name='reporte_concepto_proveedor_pdf'),
 
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+
+# Agrega los handlers de error aquí:
+handler404 = 'myapp.views.custom_404'
+handler500 = 'myapp.views.custom_500'

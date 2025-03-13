@@ -41,24 +41,58 @@
     color: #38a169; /* Texto verde oscuro */
   }
 </style>
-<main class="container mx-auto py-8">
-  <h2 class="text-3xl font-bold mb-6">Registrar Rendiciones</h2>
+<main class="container mx-auto py-2">
 <div class="bg-gray-100 p-4 rounded shadow-md mb-6">
   <h3 class="text-lg font-bold mb-2">Detalles del Gasto</h3>
-  <div class="grid grid-cols-3 gap-4">
+<div class="bg-white p-6 rounded-lg shadow-md">
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+    <!-- Sección de Requerimientos -->
     <div>
-      <p class="text-gray-700"><strong>Fecha Gasto:</strong> {{ gasto.fecha_gasto }}</p>
-      <p class="text-gray-700"><strong>Nombre Proveedor:</strong> {{ gasto.nombre_proveedor }}</p>
+      <p class="text-gray-700">
+        <span class="font-bold ">ID Requerimiento:</span>
+        {{ gasto.id_requerimiento }}
+      </p>
+      <p class="text-gray-700">
+        <span class="font-bold ">N° Requerimiento:</span>
+        {{ gasto.num_requerimiento }}
+      </p>
     </div>
+    <!-- Sección de Fecha y Proveedor -->
     <div>
-      <p class="text-gray-700"><strong>Local:</strong> {{ gasto.local }}</p>
-      <p class="text-gray-700"><strong>Importe:</strong> {{ gasto.importe }}</p>
+      <p class="text-gray-700">
+        <span class="font-bold ">Fecha Gasto:</span>
+        {{ gasto.fecha_gasto|date:"d/m/Y" }}
+      </p>
+      <p class="text-gray-700">
+        <span class="font-bold ">Nombre Proveedor:</span>
+        {{ gasto.nombre_proveedor }}
+      </p>
     </div>
+    <!-- Sección de Local e Importe -->
     <div>
-      <p class="text-gray-700"><strong>Moneda:</strong> {{ gasto.moneda }}</p>
-      <p class="text-gray-700"><strong>Observación:</strong> {{ gasto.observacion }}</p>
+      <p class="text-gray-700">
+        <span class="font-bold ">Local:</span>
+        {{ gasto.local }}
+      </p>
+      <p class="text-gray-700">
+        <span class="font-bold ">Importe:</span>
+        S/ {{ gasto.importe }}
+      </p>
+    </div>
+    <!-- Sección de Moneda y Observación (ocupa el ancho completo en pantallas medianas y superiores) -->
+    <div class="sm:col-span-2 md:col-span-3">
+      <p class="text-gray-700">
+        <span class="font-bold ">Moneda:</span>
+        {{ gasto.moneda }}
+      </p>
+      <p class="text-gray-700">
+        <span class="font-bold ">Observación:</span>
+        {{ gasto.observacion }}
+      </p>
     </div>
   </div>
+</div>
+
 </div>
   <!-- Formulario -->
     {% csrf_token %}
@@ -156,6 +190,8 @@
           <option value="RHE">RHE</option>
         <option value="Boleta de pago">Boleta de pago</option>
         <option value="Requerimiento">Requerimiento</option>
+        <option value="Sin Comprobante">Sin Comprobante</option>
+
 
         </select>
       </td>
@@ -394,12 +430,20 @@ saveButton.addEventListener('click', (e) => {
     e.preventDefault(); // Evitar el envío inmediato del formulario
     if (validarCampos()) {
         Swal.fire({
-            title: 'Confirmación',
-            text: '¿Estás seguro de que deseas guardar los datos?',
-            icon: 'question',
+            title: '⚠️ Revisa bien antes de guardar',
+            text: 'Esta acción NO se podrá borrar. ¿Estás seguro de que deseas continuar?',
+            icon: 'warning',
             showCancelButton: true,
             confirmButtonText: 'Guardar',
-            cancelButtonText: 'Cancelar'
+            cancelButtonText: 'Cancelar',
+            didOpen: () => {
+                const confirmButton = Swal.getConfirmButton();
+                confirmButton.disabled = true; // Deshabilitar el botón
+
+                setTimeout(() => {
+                    confirmButton.disabled = false; // Habilitar después de 2 segundos
+                }, 2000);
+            }
         }).then((result) => {
             if (result.isConfirmed) {
                 let rendicionesData = [];
@@ -481,6 +525,8 @@ saveButton.addEventListener('click', (e) => {
         <option value="Declaracion">Declaración</option>
         <option value="RHE">RHE</option>
         <option value="Requerimiento">Requerimiento</option>
+        <option value="Sin Comprobante">Sin Comprobante</option>
+
       </select>
     </td>
         <td class="px-4 py-2"><input type="number" name="rendiciones[${indice}][importe]" step="0.01" class="w-full border-gray-300 rounded importe-field" placeholder="Importe" required /></td>

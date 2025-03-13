@@ -1,21 +1,20 @@
+
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 <meta charset="UTF-8">
 <style>
-    /* Responsividad en diferentes tama帽os de pantalla */
 @media (min-width: 768px) {
   .modal-container {
     width: 75%;
   }
 }
-
 @media (min-width: 1024px) {
   .modal-container {
     width: 66.66%;
   }
 }
-
 </style>
 <!-- Cargar jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -23,9 +22,11 @@
 <!-- Cargar CSS de DataTables -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
+<script src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs" type="module"></script>
 
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
 <main class="flex-1 p-2">
 
 <form method="GET" action="" class="mb-2">
@@ -224,7 +225,7 @@
                     {% endif %}
                 </td>
                 <td class="px-4 py-2 border-r">{{ item.notas }}</td>
-                <td class="px-4 py-2 text-center">
+                <td class="px-4 py-2 text-center flex justify-center gap-2">
                     {% if item.tipo == 'Gasto' and item.rendido %}
                     <a href="#" class="text-blue-500 hover:text-blue-700" data-modal="modal-{{ item.id }}">
                         <i class="fas fa-eye"></i>
@@ -246,10 +247,32 @@
                        data-bs-toggle="modal"
                        data-bs-target="#editModal"
                        data-id="{{ item.id }}"
-                       data-concepto="{{ item.notas }}">
+                       data-concepto="{{ item.notas|escape }}"
+                       data-tipo="{{ item.tipo }}"
+                       data-concepto1="{{ item.concepto_nivel_1_id }}"
+                       data-concepto2="{{ item.concepto_nivel_2_id }}"
+                       data-concepto3="{{ item.concepto_nivel_3_id }}"
+                       data-requerimiento="{{item.tipo_item }}"
+                       >
                         <i class="fas fa-pen"></i>
                     </a>
+
+
                     {% endif %}
+                        <!-- Botón Yape si transferir_yape == 0 -->
+                    <!-- Enlace que abre el modal -->
+                    {% if item.transferir_yape == 0 and not user.is_staff %}
+                        <a href="javascript:void(0);" class="text-purple-500 hover:text-purple-700" onclick="openModal({{ item.id }})">
+                            <i class="fas fa-exchange-alt"></i>
+                        </a>
+                    {% endif %}
+                    {% if user.is_authenticated and user.saldo_inicial and not user.saldo_inicial.caja_cerrada and item.eliminar == "Si" %}
+                      <a href="javascript:void(0);" onclick="confirmEliminar({{ item.id }}, '{{ item.tipo }}')" class="text-red-500 hover:text-red-700">
+                          <i class="fas fa-trash"></i>
+                      </a>
+                    {% endif %}
+
+
                 </td>
 
             </tr>
@@ -258,6 +281,9 @@
     </table>
 </div>
 
+<form id="deleteForm" method="post" action="" style="display: none;">
+    {% csrf_token %}
+</form>
 
 
 <div class="mt-6  p-6 ">
@@ -298,27 +324,74 @@
 
 
 </main>
+<!-- Modal -->
+<div id="transferModal" class="hidden fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-xl font-semibold mb-4">Transferir Monto</h2>
+
+        <!-- ID oculto -->
+        <input type="hidden" id="itemId">
+
+        <!-- Campo de monto -->
+        <label class="block text-gray-700">Monto:</label>
+        <input type="number" id="monto" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Ingrese el monto">
+
+        <!-- Botón de enviar -->
+        <div class="mt-4 flex justify-end">
+            <button onclick="closeModal('transferModal')" class="px-4 py-2 bg-gray-400 text-white rounded-lg mr-2">Cancelar</button>
+            <button onclick="confirmTransfer()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Enviar</button>
+        </div>
+    </div>
+</div>
 <div id="editModal" class="fixed inset-0 z-50 hidden bg-gray-800 bg-opacity-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen">
         <!-- Modal content -->
-        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
-            <h2 class="text-2xl font-bold mb-4 text-center">Editar Movimiento</h2>
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl">
+            <h2 id="modalTitle" class="text-2xl font-bold mb-4 text-center">Editar Movimiento</h2>
             <!-- Formulario de edición -->
             <form id="updateForm" method="post" action="{% url 'actualizar_movimiento' %}">
                 {% csrf_token %}
-                <div class="mb-4">
-                    <label for="movimientoId" class="block text-sm font-medium text-gray-700">ID Movimiento</label>
-                    <input type="text" id="movimientoId" name="id" readonly class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
-                </div>
+                <!-- Campo oculto para el ID -->
+                <input type="hidden" id="movimientoId" name="id" />
+                <!-- Campo oculto para el Tipo (Gasto o Ingreso) -->
+                <input type="hidden" id="movimientoTipo" name="tipo" />
+
                 <div class="mb-4">
                     <label for="movimientoNotas" class="block text-sm font-medium text-gray-700">Notas</label>
                     <textarea
                         id="movimientoNotas"
                         name="notas"
                         required
-                        rows="5"
+                        rows="3"
                         class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-y"
                         placeholder="Escribe tus notas aquí..."></textarea>
+                </div>
+
+                <!-- Sección de Conceptos (Visible solo si es Gasto) -->
+                <div id="conceptosSection" class="hidden">
+                    <div class="mb-4">
+                        <label for="concepto_nivel_1_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 1</label>
+                        <select id="concepto_nivel_1_results" name="concepto_nivel_1" class="w-full block select2">
+                            <option value="">Seleccionar</option>
+                            {% for concepto in nivel_1_conceptos %}
+                                <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="concepto_nivel_2_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 2</label>
+                        <select id="concepto_nivel_2_results" name="concepto_nivel_2" class="w-full block select2">
+                            <option value="">Seleccionar</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="concepto_nivel_3_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 3</label>
+                        <select id="concepto_nivel_3_results" name="concepto_nivel_3" class="w-full block select2">
+                            <option value="">Seleccionar</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="flex justify-end space-x-4">
@@ -330,6 +403,102 @@
     </div>
 </div>
 
+
+
+
+{% include 'mensaje.html' %}
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    function getCSRFToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+function confirmEliminar(itemId, itemTipo) {
+    Swal.fire({
+        title: '¿Está seguro?',
+        text: "Esta acción eliminará el ítem. Si es un requerimiento, se borrarán todas las rendiciones asociadas y deberán recrearse.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Se asigna la URL de acción al formulario oculto usando backticks
+            var form = document.getElementById("deleteForm");
+            form.action = `/eliminar-item/${itemId}/${itemTipo}/`;
+            form.submit();
+        }
+    });
+}
+
+</script>
+
+
+<script>
+    function openModal(itemId) {
+        document.getElementById('itemId').value = itemId;
+        document.getElementById('transferModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+        document.getElementById('transferModal').classList.add('hidden');
+    }
+
+    function confirmTransfer() {
+        let itemId = document.getElementById('itemId').value;
+        let monto = document.getElementById('monto').value;
+
+        if (!monto || monto <= 0) {
+            Swal.fire("Error", "Ingrese un monto válido.", "error");
+            return;
+        }
+
+        Swal.fire({
+            title: "¿Estás seguro?",
+            text: "Esta acción no se puede deshacer.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Sí, transferir",
+            cancelButtonText: "Cancelar"
+        }).then((result) => {
+            if (result.isConfirmed) {
+                sendTransfer(itemId, monto);
+            }
+        });
+    }
+
+function sendTransfer(itemId, monto) {
+    fetch("{% url 'transferir_yape' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}"
+        },
+        body: JSON.stringify({
+            item_id: itemId,
+            monto: monto
+        })
+    })
+    .then(response => response.json().then(data => ({ status: response.status, body: data })))
+    .then(({ status, body }) => {
+        if (status === 200) {
+            Swal.fire("Éxito", body.message, "success");
+            closeModal('transferModal');
+            location.reload();
+        } else {
+            throw new Error(body.error || "Error desconocido");
+        }
+    })
+    .catch(error => {
+        Swal.fire("Error", `Hubo un problema con la transferencia: ${error.message}`, "error");
+    });
+}
+
+</script>
 <script>
     // Script para mostrar y cargar datos en el modal
     const editModalTrigger = document.querySelectorAll('[data-bs-toggle="modal"]');
@@ -362,6 +531,33 @@ $(document).ready(function() {
     searching: true
 
   });
+          $('#concepto_nivel_1_results').on('change', function() {
+            var conceptoId = $(this).val();
+            $.ajax({
+                url: '{% url "get_nivel_2_conceptos" %}',
+                data: {id_concepto_padre: conceptoId},
+                success: function(data) {
+                    $('#concepto_nivel_2_results').empty().append('<option value="">Seleccionar</option>');
+                    $.each(data, function(index, concepto) {
+                        $('#concepto_nivel_2_results').append('<option value="' + concepto.id + '">' + concepto.concepto_nombre + '</option>');
+                    });
+                }
+            });
+        });
+
+        $('#concepto_nivel_2_results').on('change', function() {
+            var conceptoId = $(this).val();
+            $.ajax({
+                url: '{% url "get_nivel_3_conceptos" %}',
+                data: {id_concepto_padre: conceptoId},
+                success: function(data) {
+                    $('#concepto_nivel_3_results').empty().append('<option value="">Seleccionar</option>');
+                    $.each(data, function(index, concepto) {
+                        $('#concepto_nivel_3_results').append('<option value="' + concepto.id + '">' + concepto.concepto_nombre + '</option>');
+                    });
+                }
+            });
+        });
 });
 </script>
 
@@ -370,7 +566,6 @@ document.getElementById('downloadExcelBtn').addEventListener('click', function()
     // Capturar las fechas de los inputs
     var fecha_inicio = document.getElementById('fecha_inicio').value;
     var fecha_fin = document.getElementById('fecha_fin').value;
-
     // Crear la URL con los parámetros de fecha
     var url = "{% url 'descargarexcel' %}?fecha_inicio=" + fecha_inicio + "&fecha_fin=" + fecha_fin;
 
@@ -378,25 +573,144 @@ document.getElementById('downloadExcelBtn').addEventListener('click', function()
     window.location.href = url;
 });
 </script>
-
-
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const modalLinks = document.querySelectorAll('[data-modal]');
-
-        modalLinks.forEach(link => {
-            link.addEventListener('click', function(event) {
-                event.preventDefault();
-                const modalId = this.getAttribute('data-modal');
-                document.getElementById(modalId).classList.remove('hidden');
+    document.addEventListener("DOMContentLoaded", function () {
+                // Seleccionar todos los enlaces que abren modales
+        document.querySelectorAll("[data-modal]").forEach(button => {
+            button.addEventListener("click", function () {
+                const modalId = this.getAttribute("data-modal"); // Obtener el ID del modal
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.remove("hidden"); // Mostrar el modal
+                }
             });
         });
+
+        // Función para cerrar el modal
+        window.closeModal = function (modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add("hidden"); // Ocultar el modal
+            }
+        };
+
+        // Cerrar el modal si el usuario hace clic fuera del contenido
+        document.querySelectorAll(".fixed.inset-0").forEach(modal => {
+            modal.addEventListener("click", function (e) {
+                if (e.target === this) {
+                    this.classList.add("hidden");
+                }
+            });
+        });
+        console.log("🔹 Script de edición de movimiento cargado.");
+
+        // Inicializar Select2 en los selects de conceptos con width 100%
+        $('.select2').select2({
+            placeholder: "Seleccione una opción",
+            allowClear: true,
+            width: '100%'
+        });
+        console.log("✅ Select2 inicializado en los select de conceptos.");
+
+        const editModal = document.getElementById('editModal');
+
+        document.querySelectorAll("[data-bs-toggle='modal']").forEach(trigger => {
+            trigger.addEventListener("click", function () {
+                console.log("🟡 Botón de edición clickeado.");
+
+                // Limpiar formulario antes de cargar nuevos datos
+                document.getElementById("movimientoId").value = "";
+                document.getElementById("movimientoNotas").value = "";
+                document.getElementById("modalTitle").innerText = "Editar Movimiento";
+                document.getElementById("movimientoTipo").value = "";
+
+                // Resetear Select2 de conceptos
+                $("#concepto_nivel_1_results").val(null).trigger("change");
+                $("#concepto_nivel_2_results").val(null).trigger("change");
+                $("#concepto_nivel_3_results").val(null).trigger("change");
+
+                // Ocultar la sección de conceptos por defecto
+                let conceptosSection = document.getElementById("conceptosSection");
+                conceptosSection.classList.add("hidden");
+
+                // Obtener datos del botón
+                const id = this.getAttribute("data-id");
+                const notas = this.getAttribute("data-concepto");
+                const tipo = this.getAttribute("data-tipo");
+                const concepto1 = this.getAttribute("data-concepto1");
+                const concepto2 = this.getAttribute("data-concepto2");
+                const concepto3 = this.getAttribute("data-concepto3");
+                const requerimiento=this.getAttribute("data-requerimiento");
+
+                console.log(`ℹ️ Datos recibidos -> ID: ${id}, Notas: ${notas}, Tipo: ${tipo}`);
+                console.log(`ℹ️ Conceptos -> Nivel1: ${concepto1}, Nivel2: ${concepto2}, Nivel3: ${concepto3},Requerimiento: ${requerimiento},`);
+
+                // Asignar valores al formulario
+                document.getElementById("movimientoId").value = id;
+                document.getElementById("movimientoNotas").value = notas;
+                document.getElementById("modalTitle").innerText = `Editar Movimiento #${id}`;
+                document.getElementById("movimientoTipo").value = tipo;
+
+                console.log("✅ Valores asignados al formulario.");
+
+                // Mostrar sección de conceptos si el tipo es "Gasto"
+                if (tipo === "Gasto" && requerimiento !== "Requerimiento") {
+                    console.log("📌 Tipo es 'Gasto', mostrando select de conceptos.");
+                    conceptosSection.classList.remove("hidden");
+
+                    // Preseleccionar valores en Select2 si existen
+                    if (concepto1) {
+                        setTimeout(() => {
+                            $("#concepto_nivel_1_results").val(concepto1).trigger("change");
+                            console.log("✅ Nivel 1 preseleccionado:", concepto1);
+                        }, 100);
+
+                        setTimeout(() => {
+                            if (concepto2) {
+                                $("#concepto_nivel_2_results").val(concepto2).trigger("change");
+                                console.log("✅ Nivel 2 preseleccionado:", concepto2);
+                            }
+                        }, 300);
+
+                        setTimeout(() => {
+                            if (concepto3) {
+                                $("#concepto_nivel_3_results").val(concepto3).trigger("change");
+                                console.log("✅ Nivel 3 preseleccionado:", concepto3);
+                            }
+                        }, 500);
+                    }
+                } else {
+                    console.log("📌 Tipo NO es 'Gasto', ocultando select de conceptos.");
+                }
+
+                // Mostrar el modal
+                document.getElementById("editModal").classList.remove("hidden");
+                console.log("🟢 Modal mostrado.");
+            });
+        });
+
+        // Función para cerrar modal
+        window.closeModal = function (modalId) {
+            document.getElementById(modalId).classList.add("hidden");
+        };
     });
 
     function closeModal(modalId) {
+        console.log(`🔴 Cerrando modal: ${modalId}`);
+        // Si es el modal de edición, limpiar los campos para evitar que persistan los valores
+        if (modalId === 'editModal') {
+            $('#concepto_nivel_1_results').val('').trigger('change');
+            $('#concepto_nivel_2_results').empty().append('<option value="">Seleccionar</option>').trigger('change');
+            $('#concepto_nivel_3_results').empty().append('<option value="">Seleccionar</option>').trigger('change');
+            document.getElementById("movimientoNotas").value = "";
+            document.getElementById("movimientoTipo").value = "";
+            document.getElementById("modalTitle").innerText = "Editar Movimiento";
+        }
         document.getElementById(modalId).classList.add('hidden');
     }
 </script>
-{% include 'mensaje.html' %}
+
+
+
 
 {% endblock %}

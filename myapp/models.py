@@ -4,11 +4,13 @@ from django.contrib.auth.models import User
 class SaldoInicial(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name="saldo_inicial")
     monto_saldo_inicial = models.DecimalField(max_digits=15, decimal_places=2, help_text="Saldo inicial del usuario")
+    monto_saldo_inicial_yape = models.DecimalField(max_digits=15, decimal_places=2, help_text="Saldo inicial del usuario yape")
+    caja_cerrada = models.BooleanField(default=False, help_text="Indica si la caja del usuario está cerrada")
+    fecha_cierre = models.DateField(null=True, blank=True, help_text="Fecha en la que se cerró la caja")
 
     def __str__(self):
         return f"{self.usuario.username} - Saldo Inicial: {self.monto_saldo_inicial}"
 
-# Modelo para la tabla "Fondos"
 class Fondo(models.Model):
     nombre_fondo = models.CharField(max_length=255)
 
@@ -101,6 +103,7 @@ class CajaChica(models.Model):
         return f"Caja Chica {self.id} - Fecha: {self.fecha}"
 
 from datetime import date
+
 class Gasto(models.Model):
     usuario_creador = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name='gastos_creados')
     fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
@@ -164,7 +167,7 @@ class Gasto(models.Model):
         'self',  # Relación consigo mismo
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,  # Si se borra el gasto original, no borrar los generados
+        on_delete=models.CASCADE,  # Si se borra el gasto original, se borran los generados
         related_name='gastos_generados'
     )
 
@@ -227,6 +230,7 @@ class Prestamo(models.Model):
     local = models.ForeignKey(Local, on_delete=models.CASCADE)
     dia_pago = models.PositiveIntegerField(default=1)
     monto_cuota = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Nuevo campo
+    notas = models.TextField(blank=True, null=True)  # Nuevo campo agregado
 
 
 class Ingreso(models.Model):
@@ -244,7 +248,8 @@ class Ingreso(models.Model):
     local = models.ForeignKey(Local, on_delete=models.CASCADE, related_name='ingresos_local',null=True, blank=True)
     # Nuevo campo 'extorno' por defecto a False
     extorno = models.BooleanField(default=False, null=True, blank=True)
-    # Nuevo campo 'banco' relacionado con el modelo Banco
+    importe_efectivo = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)  # Nuevo campo, NOT NULL y NOT BLANK
+    importe_yape = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)  # Nuevo campo, NOT NULL y NOT BLANK
     banco = models.ForeignKey(Banco,on_delete=models.SET_NULL,null=True,blank=True,related_name='ingresos_banco')
     gasto_origen = models.ForeignKey(
         Gasto,
@@ -282,8 +287,8 @@ class Personal(models.Model):
     remuneracion = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True,default=0.00)  # Remuneración
 
     # Datos de seguridad social
-    regimen_salud = models.CharField(max_length=50, choices=[('essalud', 'EsSalud'), ('sis', 'SIS')], blank=True, null=True)
-    regimen_pensionario = models.CharField(max_length=50, choices=[('onp', 'ONP'), ('afp', 'AFP')], blank=True, null=True)
+    regimen_salud = models.CharField(max_length=50, choices=[('ninguno', 'Ninguno'), ('essalud', 'EsSalud'), ('sis', 'SIS')], blank=True, null=True)
+    regimen_pensionario = models.CharField(max_length=50, choices=[('ninguno', 'Ninguno'),('onp', 'ONP'), ('afp', 'AFP')], blank=True, null=True)
     regimen_pensionario_details = models.CharField(max_length=255, blank=True, null=True)
 
     # Datos de la situación educativa
@@ -293,6 +298,13 @@ class Personal(models.Model):
     carrera_estudio = models.CharField(max_length=255, blank=True, null=True)
     ano_egreso = models.CharField(max_length=4, blank=True, null=True)
     contraseña_creada = models.BooleanField(default=False)
+    # Horario de Trabajo
+    turno_manana_inicio = models.TimeField(null=True, blank=True)
+    turno_manana_fin = models.TimeField(null=True, blank=True)
+    turno_tarde_inicio = models.TimeField(null=True, blank=True)
+    turno_tarde_fin = models.TimeField(null=True, blank=True)
+
+    observacion = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.apellidos_nombres} - {self.dni}"

@@ -11,7 +11,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils.dateparse import parse_date
 from django.contrib import messages
-from .models import Gasto, Concepto, Rendicion
 from django.db import IntegrityError
 import json
 from django.db.models import Sum
@@ -32,20 +31,105 @@ from requests.exceptions import Timeout, TooManyRedirects, RequestException, HTT
 from django.http import HttpResponse
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
-from .models import Personal
 from django.shortcuts import get_object_or_404
 from datetime import date
 from decimal import Decimal
 from django.shortcuts import render
 import urllib.parse
+from datetime import date, timedelta
+from django.shortcuts import render
+from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
+from django.db.models import Sum
+import io
+from openpyxl.utils import get_column_letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from django.db import connection
+
+def reiniciar_secuencia(request):
+    # Lista de tablas a limpiar. Usamos _meta.db_table para obtener el nombre real de la tabla.
+    tablas = [
+        Gasto._meta.db_table,
+        Ingreso._meta.db_table,
+        Rendicion._meta.db_table,
+    ]
+
+    with connection.cursor() as cursor:
+        for tabla in tablas:
+            # Borrar todos los registros de la tabla
+            cursor.execute(f"DELETE FROM {tabla};")
+            # Reiniciar la secuencia en SQLite
+            cursor.execute(f"DELETE FROM sqlite_sequence WHERE name='{tabla}';")
+
+    return HttpResponse("Tablas limpiadas y secuencias reiniciadas.")
+
+@csrf_exempt
+def registrar_usuario(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            username = data["username"]
+            password = data["password"]
+            saldo_efectivo = data["saldo_efectivo"]
+            saldo_yape = data["saldo_yape"]
+
+            if User.objects.filter(username=username).exists():
+                return JsonResponse({"success": False, "message": "El usuario ya existe."})
+
+            usuario = User.objects.create_user(username=username, password=password, is_active=True, is_staff=False)
+            SaldoInicial.objects.create(usuario=usuario, monto_saldo_inicial=saldo_efectivo, monto_saldo_inicial_yape=saldo_yape)
+
+            return JsonResponse({"success": True, "message": "Usuario registrado correctamente."})
+        except Exception as e:
+            return JsonResponse({"success": False, "message": f"Error: {str(e)}"})
+
+    return JsonResponse({"success": False, "message": "Método no permitido."})
+def cerrar_caja(request):
+    usuarios_no_staff = User.objects.filter(is_staff=False)  # Obtener usuarios normales
+    return render(request, 'cerrarcaja.html', {'usuarios': usuarios_no_staff})
+@login_required
+def cerrar_caja_usuario(request, user_id):
+    if request.method == "POST":
+        usuario = get_object_or_404(User, id=user_id)
+        saldo = get_object_or_404(SaldoInicial, usuario=usuario)
+
+        if not saldo.caja_cerrada:
+            saldo.caja_cerrada = True
+            saldo.fecha_cierre = now().date()
+            saldo.save()
+            return JsonResponse({"success": True, "message": f"La caja de {usuario.username} ha sido cerrada."})
+        else:
+            return JsonResponse({"success": False, "message": "La caja ya está cerrada."})
+
+    return JsonResponse({"success": False, "message": "Método no permitido."}, status=405)
+
+@login_required
+def reactivar_caja_usuario(request, user_id):
+    if request.method == "POST":
+        usuario = get_object_or_404(User, id=user_id)
+        saldo = get_object_or_404(SaldoInicial, usuario=usuario)
+
+        if saldo.caja_cerrada:
+            saldo.caja_cerrada = False
+            saldo.fecha_cierre = None
+            saldo.save()
+            return JsonResponse({"success": True, "message": f"La caja de {usuario.username} ha sido reactivada."})
+        else:
+            return JsonResponse({"success": False, "message": "La caja ya está activa."})
+
+    return JsonResponse({"success": False, "message": "Método no permitido."}, status=405)
 
 
 def editar_personal(request, id):
     personal = get_object_or_404(Personal, id=id)
+    bancos=Banco.objects.all()
     # Convertir remuneración a string con dos decimales si no es None
     if personal.remuneracion is not None:
         personal.remuneracion = f"{float(personal.remuneracion):.2f}"
-    return render(request, 'editar_personal.html', {'personal': personal})
+    return render(request, 'editar_personal.html', {'personal': personal ,'bancos':bancos})
 
 def crear_contraseña(request, personal_id):
     personal = get_object_or_404(Personal, id=personal_id)
@@ -117,7 +201,6 @@ def draw_logo(p, image_name, x=490, y=690, width=75, height=75):
     else:
         print(f"⚠️ Error: No se encontró la imagen en {image_path}")
 
-
 def generar_pdf(request, persona_id):
     try:
         persona = Personal.objects.get(id=persona_id)
@@ -132,7 +215,6 @@ def generar_pdf(request, persona_id):
         p = canvas.Canvas(response, pagesize=letter)
         # Dibujar el logo en la esquina superior derecha
         draw_logo(p, "egatur_logo.png")
-
 
         # Título
         p.setFont("Helvetica-Bold", 16)
@@ -154,21 +236,19 @@ def generar_pdf(request, persona_id):
         # Línea de separación
         draw_line(p, y_position)
         y_position -= 10
+
         # Sección II - Datos Laborales
         p.setFont("Helvetica-Bold", 12)
         p.drawString(100, y_position, "II. DATOS LABORALES")
-        y_position -= 20  # Ajustar la posición después del título de la sección
+        y_position -= 20
+
         y_position = draw_label_value(p, "PERIODO DE INICIO:", persona.periodo_inicio.strftime('%d/%m/%Y') if persona.periodo_inicio else "-", y_position)
         y_position = draw_label_value(p, "PERIODO DE FIN:", persona.periodo_fin.strftime('%d/%m/%Y') if persona.periodo_fin else "-", y_position)
         y_position = draw_label_value(p, "TIPO DE TRABAJADOR:", persona.tipo_trabajador or "-", y_position)
         y_position = draw_label_value(p, "TIPO DE CONTRATO:", persona.tipo_contrato or "-", y_position)
         y_position = draw_label_value(p, "TIPO DE PAGO:", persona.tipo_pago or "-", y_position)
-        # NUEVA LÍNEA: PERIODICIDAD DE INGRESO
         y_position = draw_label_value(p, "PERIODICIDAD DE INGRESO:", "MENSUAL", y_position)
-
-        # NUEVA LÍNEA: REMUNERACIÓN
         y_position = draw_label_value(p, "REMUNERACIÓN:", f"S/. {persona.remuneracion:.2f}" if persona.remuneracion else "S/. 0.00", y_position)
-
         y_position = draw_label_value(p, "ASIGNACIÓN FAMILIAR:", "Sí" if persona.asignacion_familiar else "No", y_position)
 
         # Línea de separación
@@ -181,20 +261,14 @@ def generar_pdf(request, persona_id):
         y_position -= 20
 
         y_position = draw_label_value(p, "RÉGIMEN DE SALUD:", (persona.regimen_salud or "-").upper(), y_position)
-        # RÉGIMEN PENSIONARIO Y SUS DETALLES EN LA MISMA LÍNEA
         p.setFont("Helvetica-Bold", 10)
         p.drawString(100, y_position, "RÉGIMEN PENSIONARIO:")
-
         p.setFont("Helvetica", 10)
         p.drawString(280, y_position, (persona.regimen_pensionario or "-").upper())
-
-        # Agregar DETALLES RÉGIMEN PENSIONARIO al costado
         p.setFont("Helvetica-Bold", 10)
         p.drawString(400, y_position, "DETALLES:")
-
         p.setFont("Helvetica", 10)
         p.drawString(460, y_position, persona.regimen_pensionario_details or "-")
-        # Línea de separación
         draw_line(p, y_position-13)
         y_position -= 20
 
@@ -208,19 +282,23 @@ def generar_pdf(request, persona_id):
         y_position = draw_label_value(p, "INSTITUCIÓN:", persona.institucion or "-", y_position)
         y_position = draw_label_value(p, "CARRERA DE ESTUDIO:", persona.carrera_estudio or "-", y_position)
         y_position = draw_label_value(p, "AÑO DE EGRESO:", persona.ano_egreso or "-", y_position)
+        # Línea de separación
+        draw_line(p, y_position)
+        y_position -= 10
+        # Sección V - Horario de Trabajo
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(100, y_position, "V. HORARIO DE TRABAJO")
+        y_position -= 20
+
+        y_position = draw_label_value(p, "TURNO MAÑANA:", f"{persona.turno_manana_inicio} - {persona.turno_manana_fin}" if persona.turno_manana_inicio and persona.turno_manana_fin else "-", y_position)
+        y_position = draw_label_value(p, "TURNO TARDE:", f"{persona.turno_tarde_inicio} - {persona.turno_tarde_fin}" if persona.turno_tarde_inicio and persona.turno_tarde_fin else "-", y_position)
 
         # Agregar líneas para firma al final del PDF
-        y_position -= 40  # Espacio antes de las firmas
-
-        # Línea izquierda (firma vacía)
-        p.line(100, y_position, 300, y_position)  # Línea
-        # Línea derecha (Firma del trabajador)
+        y_position -= 40
+        p.line(100, y_position, 300, y_position)
         p.line(350, y_position, 550, y_position)
-
-        # Nombre del trabajador a la derecha
         p.setFont("Helvetica", 10)
         p.drawString(380, y_position - 15, persona.apellidos_nombres)
-        # Finalizar el PDF
         p.showPage()
         p.save()
 
@@ -228,6 +306,7 @@ def generar_pdf(request, persona_id):
     except Exception as e:
         messages.error(request, f"Error al generar el PDF: {str(e)}")
         return redirect("ver_personal")
+
 
 
 def draw_label_value(p, label, value, y_position):
@@ -272,36 +351,83 @@ def guardar_datos_editados(request, id_personal):
             except ValueError:
                 return None  # Evita errores si la fecha no es válida
 
-        ficha = get_object_or_404(Personal, id=id_personal)
+        def get_time(field):
+            """Convierte la hora a formato correcto o devuelve None si está vacía."""
+            time_value = request.POST.get(field, "").strip()
+            try:
+                return datetime.strptime(time_value, "%H:%M").time() if time_value else None
+            except ValueError:
+                return None  # Evita errores si la hora no es válida
 
-        # Actualizar los valores
-        ficha.dni = get_value("dni")
-        ficha.nombres = get_value("nombres")
-        ficha.fecha_nacimiento = get_date("fecha_nacimiento")
-        ficha.celular = get_value("celular")
-        ficha.correo_personal = get_value("correo_personal")
-        ficha.correo_corporativo = get_value("correo_corporativo")
-        ficha.direccion = get_value("direccion")
-        ficha.fecha_inicio = get_date("fecha_inicio")
-        ficha.fecha_fin = get_date("fecha_fin")
-        ficha.tipo_trabajador = get_value("tipo_trabajador")
-        ficha.tipo_contrato = get_value("tipo_contrato")
-        ficha.tipo_pago = get_value("tipo_pago")
-        ficha.asignacion_familiar = bool(request.POST.get("asignacion_familiar"))
-        ficha.regimen_salud = get_value("regimen_salud")
-        ficha.regimen_pensionario = get_value("regimen_pensionario")
-        ficha.regimen_pensionario_details=get_value("regimen_pensionario_details")  # Agregar el campo de detalles
-        ficha.situacion_educativa = get_value("situacion_educativa")
-        ficha.tipo_instruccion = get_value("tipo_instruccion")
-        ficha.institucion = get_value("institucion")
-        ficha.carrera_estudio = get_value("carrera_estudio")
-        ficha.ocupacion = get_value("ocupacion")
-        ficha.remuneracion = get_value("remuneracion")
-        ficha.ano_egreso=get_value("ano_egreso")
+        try:
+            with transaction.atomic():  # Garantiza que todo se guarde o nada se guarde en caso de error
+                ficha = get_object_or_404(Personal, id=id_personal)
 
-        ficha.save()
-        messages.success(request, "Ficha actualizada correctamente.")
-        return redirect("ver_personal")
+                # Obtener los datos del formulario
+                banco_id = request.POST.get('nombre_cuenta')
+                banco = Banco.objects.get(id=banco_id) if banco_id else None
+
+                nuevo_cci = get_value('cci')
+
+                # Buscar la cuenta bancaria anterior con el CCI registrado en la ficha
+                cuenta_bancaria = CuentaBancaria.objects.filter(cci=ficha.cci).first()
+
+                if cuenta_bancaria:
+                    # Si la cuenta bancaria ya existe, actualizar los datos
+                    cuenta_bancaria.nombre_banco = banco.nombre if banco else ""
+                    cuenta_bancaria.numero_cuenta = get_value('numero_cuenta')
+                    cuenta_bancaria.cci = nuevo_cci
+                    cuenta_bancaria.save()
+                else:
+                    # Si no existe, crear una nueva cuenta bancaria
+                    cuenta_bancaria = CuentaBancaria.objects.create(
+                        proveedor=None,  # Ajustar si es necesario asignar un proveedor
+                        nombre_banco=banco.nombre if banco else "",
+                        numero_cuenta=get_value('numero_cuenta'),
+                        cci=nuevo_cci
+                    )
+
+                # Actualizar la ficha del personal con los nuevos valores
+                ficha.dni = get_value("dni")
+                ficha.apellidos_nombres = get_value("apellidos_nombres")
+                ficha.fecha_nacimiento = get_date("fecha_nacimiento")
+                ficha.celular = get_value("celular")
+                ficha.correo_personal = get_value("correo_personal")
+                ficha.correo_corporativo = get_value("correo_corporativo")
+                ficha.direccion = get_value("direccion")
+                ficha.periodo_inicio = get_date("periodo_inicio")
+                ficha.periodo_fin = get_date("periodo_fin")
+                ficha.tipo_trabajador = get_value("tipo_trabajador")
+                ficha.tipo_contrato = get_value("tipo_contrato")
+                ficha.tipo_pago = get_value("tipo_pago")
+                ficha.asignacion_familiar = bool(request.POST.get("asignacion_familiar"))
+                ficha.regimen_salud = get_value("regimen_salud")
+                ficha.regimen_pensionario = get_value("regimen_pensionario")
+                ficha.regimen_pensionario_details = get_value("regimen_pensionario_details")
+                ficha.situacion_educativa = get_value("situacion_educativa")
+                ficha.tipo_instruccion = get_value("tipo_instruccion")
+                ficha.institucion = get_value("institucion")
+                ficha.carrera_estudio = get_value("carrera_estudio")
+                ficha.ocupacion = get_value("ocupacion")
+                ficha.remuneracion = get_value("remuneracion")
+                ficha.ano_egreso = get_value("ano_egreso")
+                ficha.nombre_cuenta = banco.nombre if banco else ""
+                ficha.numero_cuenta = get_value('numero_cuenta')
+                ficha.cci = nuevo_cci
+                ficha.turno_manana_inicio = get_time("turno_manana_inicio")
+                ficha.turno_manana_fin = get_time("turno_manana_fin")
+                ficha.turno_tarde_inicio = get_time("turno_tarde_inicio")
+                ficha.turno_tarde_fin = get_time("turno_tarde_fin")
+                ficha.observacion = get_value("observaciones")
+
+                ficha.save()
+
+                messages.success(request, "Ficha  actualizada")
+                return redirect("ver_personal")
+
+        except Exception as e:
+            messages.error(request, f"Error al actualizar la ficha: {str(e)}")
+            return redirect("ver_personal")
 
 
 @csrf_exempt
@@ -384,13 +510,258 @@ def reportes(request):
     # Filtrar los conceptos de nivel 1 y nivel 2
     conceptos_nivel_1 = Concepto.objects.filter(nivel=1)
     conceptos_nivel_2 = Concepto.objects.filter(nivel=2)
-
-    # Pasa ambos conjuntos de conceptos al contexto
+    proveedores = Proveedor.objects.all()  # Aquí estaba el error en "Proveedor.all()"
+    # Pasa todos los conjuntos de datos al contexto
     return render(request, 'reportes.html', {
         'conceptos_nivel_1': conceptos_nivel_1,
         'conceptos_nivel_2': conceptos_nivel_2,
+        'proveedores': proveedores,  # Ahora también pasamos proveedores
     })
 
+import io
+from datetime import date
+from django.http import HttpResponse
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from myapp.models import Proveedor, Gasto  # Ajusta según tu app
+
+def trigger_error(request):
+    # Esto arrojará un error ZeroDivisionError, provocando un error 500.
+    division_by_zero = 1 / 0
+
+def custom_404(request, exception):
+    return render(request, '404.html', status=404)
+
+def custom_500(request):
+    return render(request, '500.html', status=500)
+def reporte_proveedor_pdf(request):
+    # Obtener el id del proveedor desde el parámetro GET (ejemplo: ?proveedor=120)
+    proveedor_id = request.GET.get('proveedor')
+    if not proveedor_id:
+        return HttpResponse("Proveedor no especificado.", status=400)
+
+    try:
+        proveedor = Proveedor.objects.get(pk=proveedor_id)
+    except Proveedor.DoesNotExist:
+        return HttpResponse("Proveedor no encontrado.", status=404)
+
+    # Mes actual
+    current_month = date.today().month
+
+    # Obtener registros de Gasto y Rendicion que correspondan al proveedor y al mes actual
+    gastos_queryset = Gasto.objects.filter(nombre_proveedor=proveedor, fecha_gasto__month=current_month).exclude(tipo_comprobante="Requerimiento",gasto_origen__isnull=True)
+    rendiciones_queryset = Rendicion.objects.filter(proveedor=proveedor, fecha_operacion__month=current_month)
+
+    # Combinar ambos querysets en una lista
+    registros = list(gastos_queryset) + list(rendiciones_queryset)
+
+    # Función auxiliar para obtener la fecha (diferente en cada modelo)
+    def get_fecha(registro):
+        if hasattr(registro, 'fecha_gasto') and registro.fecha_gasto:
+            return registro.fecha_gasto
+        elif hasattr(registro, 'fecha_operacion') and registro.fecha_operacion:
+            return registro.fecha_operacion
+        return date.today()
+
+    # Ordenar los registros por fecha
+    registros.sort(key=get_fecha)
+
+    # Crear el buffer y documento PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Estilo para la columna Concepto (para que el texto se ajuste)
+    concept_style = ParagraphStyle(
+        name='ConceptStyle',
+        parent=styles['BodyText'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=12,
+        alignment=0  # Alineación izquierda
+    )
+
+    # Título del reporte
+    titulo = f"Reporte de Gastos y Rendiciones para el Proveedor: {proveedor.razon_social} - {date.today().strftime('%B %Y')}"
+    elements.append(Paragraph(titulo, styles['Title']))
+    elements.append(Spacer(1, 12))
+
+    # Preparar los datos de la tabla
+    data = []
+    headers = ["Fecha", "Concepto", "Tipo Comprobante", "Importe"]
+    data.append(headers)
+    total_importe = 0
+
+    for reg in registros:
+        # Obtener la fecha
+        if hasattr(reg, 'fecha_gasto') and reg.fecha_gasto:
+            fecha_str = reg.fecha_gasto.strftime("%Y-%m-%d")
+        elif hasattr(reg, 'fecha_operacion') and reg.fecha_operacion:
+            fecha_str = reg.fecha_operacion.strftime("%Y-%m-%d")
+        else:
+            fecha_str = ""
+
+        # Determinar el concepto de mayor nivel (nivel 3, sino nivel 2, sino nivel 1)
+        if hasattr(reg, 'concepto_nivel_3') and reg.concepto_nivel_3:
+            concepto_str = reg.concepto_nivel_3.concepto_nombre
+        elif hasattr(reg, 'concepto_nivel_2') and reg.concepto_nivel_2:
+            concepto_str = reg.concepto_nivel_2.concepto_nombre
+        elif hasattr(reg, 'concepto_nivel_1') and reg.concepto_nivel_1:
+            concepto_str = reg.concepto_nivel_1.concepto_nombre
+        else:
+            concepto_str = ""
+
+        # Tipo de comprobante (ambos modelos tienen 'tipo_comprobante')
+        tipo_comp = reg.tipo_comprobante if hasattr(reg, 'tipo_comprobante') and reg.tipo_comprobante else ""
+
+        # Importe
+        importe_val = float(reg.importe) if reg.importe else 0
+        total_importe += importe_val
+
+        # Envolver el concepto en un Paragraph para que se ajuste en la celda
+        concepto_paragraph = Paragraph(concepto_str, concept_style)
+
+        data.append([fecha_str, concepto_paragraph, tipo_comp, f"{importe_val:,.2f}"])
+
+    # Agregar la fila de Total
+    data.append(["", "", "Total", f"{total_importe:,.2f}"])
+
+    # Crear la tabla con anchos de columna fijos
+    table = Table(data, colWidths=[100, 250, 150, 100])
+    table_style = TableStyle([
+        # Encabezado: fondo celeste y texto blanco
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        # Fila de Total: fondo gris y negrita
+        ('BACKGROUND', (0, -1), (-1, -1), colors.grey),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        # Bordes para toda la tabla
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ])
+    table.setStyle(table_style)
+    elements.append(table)
+
+    # Construir el PDF
+    doc.build(elements)
+    buffer.seek(0)
+
+    # Preparar la respuesta HTTP para la descarga
+    response = HttpResponse(buffer, content_type='application/pdf')
+    filename = f"reporte_proveedor_{proveedor.razon_social}_{date.today().strftime('%B')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+
+def reporte_proveedor_excel(request):
+    # Obtener el id del proveedor desde el parámetro GET (por ejemplo, ?proveedor=120)
+    proveedor_id = request.GET.get('proveedor')
+    if not proveedor_id:
+        return HttpResponse("Proveedor no especificado.", status=400)
+
+    try:
+        proveedor = Proveedor.objects.get(pk=proveedor_id)
+    except Proveedor.DoesNotExist:
+        return HttpResponse("Proveedor no encontrado.", status=404)
+
+    # Obtener el mes actual (para filtrar los gastos del mes actual)
+    current_month = date.today().month
+
+    # Filtrar los gastos usando el campo 'nombre_proveedor'
+    gastos = Gasto.objects.filter(nombre_proveedor=proveedor, fecha_gasto__month=current_month)
+
+    # Crear el libro y la hoja
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reporte Proveedor"
+
+    # Título: crear una fila superior con celdas fusionadas
+    titulo = f"Reporte de Gastos para el Proveedor: {proveedor.razon_social} - {date.today().strftime('%B %Y')}"
+    ws.merge_cells('A1:F1')
+    ws['A1'] = titulo
+    ws['A1'].font = Font(bold=True, size=14)
+    ws['A1'].alignment = Alignment(horizontal='center')
+
+    # Encabezados de la tabla (fila 3)
+    headers = ["Fecha Gasto", "Concepto", "Local", "Tipo Comprobante", "Importe", "Observación"]
+    header_row = 3
+    header_fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+    for col_num, header in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col_num, value=header)
+        cell.font = Font(bold=True)
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+
+    # Rellenar la tabla con los datos (a partir de la fila 4)
+    data_start_row = header_row + 1
+    current_row = data_start_row
+    total_importe = 0
+
+    for gasto in gastos:
+        # Determinar el concepto de mayor nivel para el gasto.
+        if gasto.concepto_nivel_3:
+            concepto_str = gasto.concepto_nivel_3.concepto_nombre
+        elif gasto.concepto_nivel_2:
+            concepto_str = gasto.concepto_nivel_2.concepto_nombre
+        elif gasto.concepto_nivel_1:
+            concepto_str = gasto.concepto_nivel_1.concepto_nombre
+        else:
+            concepto_str = ""
+
+        # Formatear la fecha (si está disponible)
+        fecha_str = gasto.fecha_gasto.strftime("%Y-%m-%d") if gasto.fecha_gasto else ""
+        # Convertir el campo local a cadena (utiliza __str__ del modelo Local)
+        local_str = str(gasto.local)
+        tipo_comp = gasto.tipo_comprobante
+        importe_val = float(gasto.importe)
+        observacion_val = gasto.observacion
+
+        ws.cell(row=current_row, column=1, value=fecha_str)
+        ws.cell(row=current_row, column=2, value=concepto_str)
+        ws.cell(row=current_row, column=3, value=local_str)
+        ws.cell(row=current_row, column=4, value=tipo_comp)
+        imp_cell = ws.cell(row=current_row, column=5, value=importe_val)
+        imp_cell.number_format = '#,##0.00'
+        ws.cell(row=current_row, column=6, value=observacion_val)
+
+        total_importe += importe_val
+        current_row += 1
+
+    # Agregar fila de total (después de los datos)
+    total_row = current_row + 1
+    ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=4)
+    total_label = ws.cell(row=total_row, column=1, value="Total")
+    total_label.font = Font(bold=True)
+    total_label.alignment = Alignment(horizontal='right')
+    total_cell = ws.cell(row=total_row, column=5, value=total_importe)
+    total_cell.font = Font(bold=True)
+    total_cell.fill = header_fill
+    total_cell.number_format = '#,##0.00'
+
+    # Ajustar el ancho de las columnas según el contenido usando get_column_letter
+    for i, col in enumerate(ws.columns, start=1):
+        max_length = 0
+        column = get_column_letter(i)
+        for cell in col:
+            if cell.value:
+                length = len(str(cell.value))
+                if length > max_length:
+                    max_length = length
+        ws.column_dimensions[column].width = max_length + 2
+
+    # Preparar la respuesta HTTP con el Excel para descarga directa
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    filename = f"reporte_proveedor_{proveedor.razon_social}_{date.today().strftime('%B')}.xlsx"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    wb.save(response)
+    return response
 def convertir_a_float(valor):
     """Convierte un string con coma o punto decimal a float correctamente."""
     if isinstance(valor, str):
@@ -481,86 +852,169 @@ def generar_reporte_diario(request):
 
 def reporte_mensual(request):
     if request.method == "POST":
-        mes_numero = request.POST.get("mes")
-        if not mes_numero:
-            return HttpResponse("Debe seleccionar un mes.", status=400)
+        mes_inicio_str = request.POST.get("mes_inicio")
+        mes_fin_str = request.POST.get("mes_fin")
+        if not mes_inicio_str or not mes_fin_str:
+            return HttpResponse("Debe seleccionar el mes de inicio y el mes de fin.", status=400)
 
+        try:
+            mes_inicio = int(mes_inicio_str)
+            mes_fin = int(mes_fin_str)
+        except ValueError:
+            return HttpResponse("Mes inválido.", status=400)
+
+        if mes_inicio > mes_fin:
+            return HttpResponse("El mes de inicio no puede ser mayor que el mes de fin.", status=400)
+
+        # Crear libro y hoja de Excel
         wb = Workbook()
         ws = wb.active
-        ws.title = f"Reporte Mensual - {mes_numero}"
+        ws.title = f"Reporte Mensual {mes_inicio:02d} a {mes_fin:02d}"
 
         # Estilos
         bold_font = Font(bold=True)
         bold_gray_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+        bold_blue_fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+        italic_bold_font = Font(bold=True, italic=True)
+        gray_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+        yellow_fill = PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid")
 
-        # Encabezado
-        ws.append(["Concepto", "Total"])
+        # Nombres de los meses (lista de 12 elementos)
+        nombres_meses = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ]
+        # Seleccionar los nombres de los meses que están en el rango (índices de 0 a 11)
+        meses_rango = nombres_meses[mes_inicio-1:mes_fin]
+
+        # Encabezado de la hoja: Concepto, columnas para cada mes en el rango y Total
+        ws.append(['Concepto'] + meses_rango + ['Total'])
         for cell in ws[1]:
             cell.font = bold_font
 
-        # Variable para el total general de los conceptos nivel 1
+        # Variables para acumulación de totales
+        total_general_mes = [0] * (mes_fin - mes_inicio + 1)
         total_general = 0
-        row = 2
 
-        # Conceptos de nivel 1
+        # Procesar conceptos de nivel 1
         conceptos_nivel_1 = Concepto.objects.filter(nivel=1)
         for concepto1 in conceptos_nivel_1:
-            total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_1=concepto1)
-                         .aggregate(total=Sum('importe'))['total'] or 0) \
-                      + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_1=concepto1)
-                         .aggregate(total=Sum('importe'))['total'] or 0)
+            valores_mensuales = []
+            total_concepto = 0
 
-            total_general += total_mes  # Solo sumar los totales de nivel 1
-            ws.append([concepto1.concepto_nombre, total_mes])
-            for cell in ws[row]:
+            # Iterar sólo sobre los meses del rango
+            for idx, mes_numero in enumerate(range(mes_inicio, mes_fin+1)):
+                total_mes = (
+                    Gasto.objects.filter(
+                        fecha_gasto__month=mes_numero,
+                        concepto_nivel_1=concepto1
+                    ).aggregate(total=Sum('importe'))['total'] or 0
+                ) + (
+                    Rendicion.objects.filter(
+                        fecha_operacion__month=mes_numero,
+                        concepto_nivel_1=concepto1
+                    ).aggregate(total=Sum('importe'))['total'] or 0
+                )
+
+                # Para "GASTOS DIVERSOS", sumar también requerimientos no rendidos (excluyendo aquellos ya vinculados a rendiciones)
+                if concepto1.concepto_nombre == "GASTOS DIVERSOS":
+                    total_mes += (
+                        Gasto.objects.filter(
+                            fecha_gasto__month=mes_numero,
+                            tipo_comprobante="Requerimiento",
+                            rendido=False,
+                            rendiciones_gasto__isnull=True
+                        ).aggregate(total=Sum('importe'))['total'] or 0
+                    )
+
+                valores_mensuales.append(total_mes)
+                total_concepto += total_mes
+                total_general_mes[idx] += total_mes
+
+            total_general += total_concepto
+            ws.append([concepto1.concepto_nombre] + valores_mensuales + [total_concepto])
+            # Aplicar estilos
+            for cell in ws[ws.max_row]:
                 cell.font = bold_font
-            ws[row - 1][0].fill = bold_gray_fill
-            row += 1
+            ws.cell(row=ws.max_row, column=1).fill = bold_gray_fill
 
-            # Conceptos de nivel 2
+            # Procesar conceptos de nivel 2
             conceptos_nivel_2 = Concepto.objects.filter(id_concepto_padre=concepto1)
             for concepto2 in conceptos_nivel_2:
-                total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_2=concepto2)
-                             .aggregate(total=Sum('importe'))['total'] or 0) \
-                          + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_2=concepto2)
-                             .aggregate(total=Sum('importe'))['total'] or 0)
+                valores_mensuales = []
+                total_concepto = 0
+                for mes_numero in range(mes_inicio, mes_fin+1):
+                    if concepto2.concepto_nombre == "ENTREGAS DE EFECTIVO PENDIENTES POR RENDIR CUENTAS":
+                        total_mes = (
+                            Gasto.objects.filter(
+                                fecha_gasto__month=mes_numero,
+                                tipo_comprobante="Requerimiento",
+                                rendido=False,
+                                gasto_origen__isnull=True  # Asegura que gasto_origen esté vacío
+                            ).aggregate(total=Sum('importe'))['total'] or 0
+                        )
+                    else:
+                        total_mes = (
+                            Gasto.objects.filter(
+                                fecha_gasto__month=mes_numero,
+                                concepto_nivel_2=concepto2
+                            ).aggregate(total=Sum('importe'))['total'] or 0
+                        ) + (
+                            Rendicion.objects.filter(
+                                fecha_operacion__month=mes_numero,
+                                concepto_nivel_2=concepto2
+                            ).aggregate(total=Sum('importe'))['total'] or 0
+                        )
+                    valores_mensuales.append(total_mes)
+                    total_concepto += total_mes
+                ws.append(["   " + concepto2.concepto_nombre] + valores_mensuales + [total_concepto])
+                ws.cell(row=ws.max_row, column=1).font = bold_font
 
-                ws.append(["   " + concepto2.concepto_nombre, total_mes])
-                ws[row - 1][0].font = bold_font
-                row += 1
-
-                # Conceptos de nivel 3
+                # Procesar conceptos de nivel 3
                 conceptos_nivel_3 = Concepto.objects.filter(id_concepto_padre=concepto2)
                 for concepto3 in conceptos_nivel_3:
-                    total_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_3=concepto3)
-                                 .aggregate(total=Sum('importe'))['total'] or 0) \
-                              + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_3=concepto3)
-                                 .aggregate(total=Sum('importe'))['total'] or 0)
+                    valores_mensuales = []
+                    total_concepto = 0
+                    for mes_numero in range(mes_inicio, mes_fin+1):
+                        total_mes = (
+                            Gasto.objects.filter(
+                                fecha_gasto__month=mes_numero,
+                                concepto_nivel_3=concepto3
+                            ).aggregate(total=Sum('importe'))['total'] or 0
+                        ) + (
+                            Rendicion.objects.filter(
+                                fecha_operacion__month=mes_numero,
+                                concepto_nivel_3=concepto3
+                            ).aggregate(total=Sum('importe'))['total'] or 0
+                        )
+                        valores_mensuales.append(total_mes)
+                        total_concepto += total_mes
+                    ws.append(["      " + concepto3.concepto_nombre] + valores_mensuales + [total_concepto])
+                    ws.cell(row=ws.max_row, column=1).fill = yellow_fill
 
-                    ws.append(["      " + concepto3.concepto_nombre, total_mes])
-                    row += 1
-
-        # Agregar total general solo de los conceptos de nivel 1
-        ws.append(["TOTAL GENERAL", total_general])
-        for cell in ws[row]:
+        # Agregar fila final con totales por mes y total general
+        ws.append(["Total por Mes"] + total_general_mes + [total_general])
+        for cell in ws[ws.max_row]:
             cell.font = bold_font
-            cell.fill = bold_gray_fill
+            cell.fill = bold_blue_fill
 
-        # Generar respuesta HTTP con el archivo Excel
+        # Generar respuesta HTTP para la descarga del archivo Excel
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = f'attachment; filename="Reporte_Mensual_{mes_numero}_{date.today().year}.xlsx"'
+        response['Content-Disposition'] = f'attachment; filename="Reporte_Mensual_{mes_inicio:02d}_{mes_fin:02d}_{date.today().year}.xlsx"'
         wb.save(response)
         return response
 
-    return HttpResponse("Método no permitido", status=405)
+
+
 def reporte_anual(request):
     wb = Workbook()
     ws = wb.active
     ws.title = "Reporte Anual"
 
     # Estilos
-    bold_font = Font(bold=True)  # Negrita
-    bold_gray_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")  # Fondo gris claro
+    bold_font = Font(bold=True)
+    bold_gray_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+    bold_blue_fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
 
     # Nombres de los meses
     meses = [
@@ -573,75 +1027,75 @@ def reporte_anual(request):
     for cell in ws[1]:
         cell.font = bold_font
 
+    # Variables para el total final
+    total_general_mes = [0] * 12
+    total_general_anual = 0
+
     # Conceptos de nivel 1
     conceptos_nivel_1 = Concepto.objects.filter(nivel=1)
-    row = 2
     for concepto1 in conceptos_nivel_1:
         valores_mensuales = []
-        total_anual = 0  # Inicializar el total anual
-        total_mes = [0] * 12  # Inicializar la lista para los totales de cada mes
+        total_anual = 0
 
-        for mes in meses:
-            mes_numero = meses.index(mes) + 1
-            total_mes_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_1=concepto1)
-                             .aggregate(total=Sum('importe'))['total'] or 0) \
-                              + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_1=concepto1)
-                             .aggregate(total=Sum('importe'))['total'] or 0)
+        for mes_numero in range(1, 13):
+            total_mes_mes = (
+                Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_1=concepto1)
+                .aggregate(total=Sum('importe'))['total'] or 0
+            ) + (
+                Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_1=concepto1)
+                .aggregate(total=Sum('importe'))['total'] or 0
+            )
+
+            # Si el concepto es "GASTOS DIVERSOS", sumar también los Requerimientos no rendidos
+            if concepto1.concepto_nombre == "GASTOS DIVERSOS":
+                total_mes_mes += (
+                    Gasto.objects.filter(fecha_gasto__month=mes_numero, tipo_comprobante="Requerimiento", rendido=False)
+                    .aggregate(total=Sum('importe'))['total'] or 0
+                )
+
             valores_mensuales.append(total_mes_mes)
-            total_anual += total_mes_mes  # Acumular el total anual
-            total_mes[mes_numero - 1] += total_mes_mes  # Acumular total por mes
+            total_anual += total_mes_mes
+            total_general_mes[mes_numero - 1] += total_mes_mes
 
-        # Insertar los datos del concepto de nivel 1
+        total_general_anual += total_anual
         ws.append([concepto1.concepto_nombre] + valores_mensuales + [total_anual])
-        row += 1
-
-        # Aplicar formato de negrita y fondo gris para nivel 1
-        for cell in ws[row - 1]:
+        for cell in ws[ws.max_row]:
             cell.font = bold_font
-        ws[row - 1][0].fill = bold_gray_fill
+        ws[ws.max_row][0].fill = bold_gray_fill
 
         # Conceptos de nivel 2
         conceptos_nivel_2 = Concepto.objects.filter(id_concepto_padre=concepto1)
         for concepto2 in conceptos_nivel_2:
             valores_mensuales = []
-            total_anual = 0  # Inicializar el total anual
-            for mes in meses:
-                mes_numero = meses.index(mes) + 1
-                total_mes_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_2=concepto2)
-                                 .aggregate(total=Sum('importe'))['total'] or 0) \
-                                  + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_2=concepto2)
-                                 .aggregate(total=Sum('importe'))['total'] or 0)
+            total_anual = 0
+
+            for mes_numero in range(1, 13):
+                total_mes_mes = (
+                    Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_2=concepto2)
+                    .aggregate(total=Sum('importe'))['total'] or 0
+                ) + (
+                    Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_2=concepto2)
+                    .aggregate(total=Sum('importe'))['total'] or 0
+                )
+
+                # Si es "ENTREGAS DE EFECTIVO PENDIENTES POR RENDIR CUENTAS", sumar Requerimientos no rendidos
+                if concepto2.concepto_nombre == "ENTREGAS DE EFECTIVO PENDIENTES POR RENDIR CUENTAS":
+                    total_mes_mes = (
+                        Gasto.objects.filter(fecha_gasto__month=mes_numero, tipo_comprobante="Requerimiento", rendido=False,gasto_origen__isnull=True)
+                        .aggregate(total=Sum('importe'))['total'] or 0
+                    )
+
                 valores_mensuales.append(total_mes_mes)
-                total_anual += total_mes_mes  # Acumular el total anual
+                total_anual += total_mes_mes
 
             ws.append(["   " + concepto2.concepto_nombre] + valores_mensuales + [total_anual])
-            row += 1
+            ws[ws.max_row][0].font = bold_font
 
-            # Aplicar formato de negrita para nivel 2
-            ws[row - 1][0].font = bold_font
-
-            # Conceptos de nivel 3
-            conceptos_nivel_3 = Concepto.objects.filter(id_concepto_padre=concepto2)
-            for concepto3 in conceptos_nivel_3:
-                valores_mensuales = []
-                total_anual = 0  # Inicializar el total anual
-                for mes in meses:
-                    mes_numero = meses.index(mes) + 1
-                    total_mes_mes = (Gasto.objects.filter(fecha_gasto__month=mes_numero, concepto_nivel_3=concepto3)
-                                     .aggregate(total=Sum('importe'))['total'] or 0) \
-                                      + (Rendicion.objects.filter(fecha_operacion__month=mes_numero, concepto_nivel_3=concepto3)
-                                     .aggregate(total=Sum('importe'))['total'] or 0)
-                    valores_mensuales.append(total_mes_mes)
-                    total_anual += total_mes_mes  # Acumular el total anual
-
-                ws.append(["      " + concepto3.concepto_nombre] + valores_mensuales + [total_anual])
-                row += 1
-
-        # Agregar el total de la suma por cada mes de los conceptos de nivel 1
-        ws.append(['Total por Mes'] + total_mes + [sum(total_mes)])
-        for cell in ws[row]:
-            cell.font = bold_font
-        ws[row][0].fill = bold_gray_fill
+    # Agregar la fila final con el total por mes y total anual
+    ws.append(["Total por Mes"] + total_general_mes + [total_general_anual])
+    for cell in ws[ws.max_row]:
+        cell.font = bold_font
+        cell.fill = bold_blue_fill
 
     # Generar respuesta HTTP para la descarga del archivo
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -650,17 +1104,24 @@ def reporte_anual(request):
     return response
 
 
+
+
+from django.db import transaction
 @login_required
 def ver_personal(request):
-    # Obtener todos los registros del modelo Personal
-    personal = Personal.objects.all()
+    today = date.today()  # Fecha actual
+    hace_7_dias = today + timedelta(days=7)  # Hace una semana
 
-    return render(request, 'ver_personal.html', {'personal': personal})
+    personal = Personal.objects.all()  # Obtener los registros de Personal
 
+    return render(request, 'ver_personal.html', {
+        'personal': personal,
+        'today': today,
+        'hace_7_dias': hace_7_dias  # Pasamos la fecha al template
+    })
 
 def guardar_datos1(request):
     if request.method == 'POST':
-        # Funciones para manejar los valores y las fechas
         def get_value(field):
             """Devuelve un string vacío ("") si el campo está vacío."""
             value = request.POST.get(field, "").strip()
@@ -673,59 +1134,83 @@ def guardar_datos1(request):
                 return datetime.strptime(date_value, "%Y-%m-%d").date() if date_value else None
             except ValueError:
                 return None  # Evita errores si la fecha no es válida
-
+        def get_time(field):
+            """Convierte la hora a formato correcto o devuelve None si está vacía."""
+            time_value = request.POST.get(field, "").strip()
+            try:
+                return datetime.strptime(time_value, "%H:%M").time() if time_value else None
+            except ValueError:
+                return None  # Evita errores si la hora no es válida
         # Verificar si ya existe un proveedor con el mismo DNI
         if Proveedor.objects.filter(ruc_dni=request.POST['dni']).exists():
             return JsonResponse({'error': 'Ya existe un proveedor con ese DNI. Elimine el proveedor antes de continuar.'}, status=400)
 
-        # Guardar los datos del Personal
-        personal = Personal(
-            dni=get_value('dni'),
-            apellidos_nombres=get_value('apellidos_nombres'),
-            fecha_nacimiento=get_date('fecha_nacimiento'),
-            celular=get_value('celular'),
-            correo_personal=get_value('correo_personal'),
-            correo_corporativo=get_value('correo_corporativo'),
-            direccion=get_value('direccion'),
-            periodo_inicio=get_date('periodo_inicio'),
-            periodo_fin=get_date('periodo_fin'),
-            tipo_trabajador=get_value('tipo_trabajador'),
-            tipo_contrato=get_value('tipo_contrato'),
-            tipo_pago=get_value('tipo_pago'),
-            nombre_cuenta=get_value('nombre_cuenta'),
-            numero_cuenta=get_value('numero_cuenta'),
-            asignacion_familiar=request.POST.get('asignacion_familiar') == 'on',
-            ocupacion=get_value('ocupacion'),
-            remuneracion=get_value('remuneracion'),
-            regimen_salud=get_value('regimen_salud'),
-            regimen_pensionario=get_value('regimen_pensionario'),
-            situacion_educativa=get_value('situacion_educativa'),
-            tipo_instruccion=get_value('tipo_instruccion'),
-            institucion=get_value('institucion'),
-            carrera_estudio=get_value('carrera_estudio'),
-            ano_egreso=get_value('ano_egreso'),
-            cci=get_value('cci'),
-        )
-        personal.save()
+        try:
+            with transaction.atomic():  # Garantiza que todo se guarde o nada se guarde
+                # Obtener el banco seleccionado
+                banco_id = request.POST.get('nombre_cuenta')
+                banco = Banco.objects.get(id=banco_id) if banco_id else None
 
-        # Crear un Proveedor con los datos del Personal
-        proveedor = Proveedor(
-            ruc_dni=personal.dni,  # DNI como RUC_DNI
-            razon_social=personal.apellidos_nombres,  # Apellidos y nombres como razón social
-            telefono=personal.celular,  # Celular como teléfono
-            nombre_contacto=""  # Nombre de contacto vacío
-        )
-        proveedor.save()  # Guardar el proveedor
-        # Crear una cuenta bancaria asociada al proveedor
-        cuenta_bancaria = CuentaBancaria(
-            proveedor=proveedor,
-            nombre_banco=personal.nombre_cuenta,  # Se iguala a nombre_cuenta del personal
-            numero_cuenta=personal.numero_cuenta,  # Se iguala a numero_cuenta del personal
-            cci=personal.cci  # Se iguala a cci del personal
-        )
-        cuenta_bancaria.save()  # Guardar la cuenta bancaria
-        # Respuesta de éxito en formato JSON
-        return JsonResponse({'success': 'Datos guardados correctamente y proveedor creado.'}, status=200)
+                # Guardar los datos del Personal
+                personal = Personal(
+                    dni=get_value('dni'),
+                    apellidos_nombres=get_value('apellidos_nombres'),
+                    fecha_nacimiento=get_date('fecha_nacimiento'),
+                    celular=get_value('celular'),
+                    correo_personal=get_value('correo_personal'),
+                    correo_corporativo=get_value('correo_corporativo'),
+                    direccion=get_value('direccion'),
+                    periodo_inicio=get_date('periodo_inicio'),
+                    periodo_fin=get_date('periodo_fin'),
+                    tipo_trabajador=get_value('tipo_trabajador'),
+                    tipo_contrato=get_value('tipo_contrato'),
+                    tipo_pago=get_value('tipo_pago'),
+                    nombre_cuenta=banco.nombre,
+                    numero_cuenta=get_value('numero_cuenta'),
+                    asignacion_familiar=request.POST.get('asignacion_familiar') == 'on',
+                    ocupacion=get_value('ocupacion'),
+                    remuneracion=get_value('remuneracion'),
+                    regimen_salud=get_value('regimen_salud'),
+                    regimen_pensionario=get_value('regimen_pensionario'),
+                    situacion_educativa=get_value('situacion_educativa'),
+                    tipo_instruccion=get_value('tipo_instruccion'),
+                    institucion=get_value('institucion'),
+                    carrera_estudio=get_value('carrera_estudio'),
+                    ano_egreso=get_value('ano_egreso'),
+                    cci=get_value('cci'),
+                    # Guardar los horarios de trabajo
+                    turno_manana_inicio=get_time('turno_manana_inicio'),
+                    turno_manana_fin=get_time('turno_manana_fin'),
+                    turno_tarde_inicio=get_time('turno_tarde_inicio'),
+                    turno_tarde_fin=get_time('turno_tarde_fin'),
+                )
+                personal.save()
+
+                # Crear un Proveedor con los datos del Personal
+                proveedor = Proveedor(
+                    ruc_dni=personal.dni,
+                    razon_social=personal.apellidos_nombres,
+                    telefono=personal.celular,
+                    nombre_contacto=""
+                )
+                proveedor.save()
+
+                # Crear una cuenta bancaria asociada al proveedor
+                cuenta_bancaria = CuentaBancaria(
+                    proveedor=proveedor,
+                    nombre_banco=personal.nombre_cuenta,
+                    numero_cuenta=personal.numero_cuenta,
+                    cci=personal.cci
+                )
+                cuenta_bancaria.save()
+
+            return JsonResponse({'success': 'Datos guardados correctamente y proveedor creado.'}, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': f'Error al guardar los datos: {str(e)}'}, status=500)
+
+
+
 
 
 def generar_reporte_json(request):
@@ -778,6 +1263,8 @@ def generar_reporte_json(request):
                     'fecha': item.fecha_gasto.strftime("%d/%m/%Y") if hasattr(item, 'fecha_gasto') and item.fecha_gasto else (
                         item.fecha_operacion.strftime("%d/%m/%Y") if item.fecha_operacion else 'Sin Fecha'
                     ),
+                    'observacion': item.observacion if hasattr(item, 'observacion') and item.observacion else ''
+
                 })
                 total_importe += item.importe if item.importe else 0
 
@@ -959,20 +1446,58 @@ def obtener_saldo_inicial_manual(fecha_inicio, usuario=None):
 
 def actualizar_movimiento(request):
     if request.method == 'POST':
-        gasto_id = request.POST.get('id')
+        item_id = request.POST.get('id')
         observacion = request.POST.get('notas')
+        tipo = request.POST.get('tipo')  # Se recibe el tipo de movimiento
 
-        # Buscar el gasto
-        gasto = get_object_or_404(Gasto, id=gasto_id)
+        try:
+            item_id = int(item_id)
+        except (ValueError, TypeError):
+            messages.error(request, "ID inválido.")
+            return redirect('caja_chica')
 
-        # Actualizar la observación
-        gasto.observacion = observacion
-        gasto.save()
+        if tipo == "Gasto":
+            item = get_object_or_404(Gasto, id=item_id)
+            # Actualizar la observación
+            item.observacion = observacion
 
-        # Mensaje de éxito con el ID del gasto actualizado
-        messages.success(request, f"Se actualizó la observación del gasto con ID {gasto.id}.")
+            # Actualizar conceptos según los nombres en el formulario
+            concepto1_id = request.POST.get('concepto_nivel_1', '').strip()
+            concepto2_id = request.POST.get('concepto_nivel_2', '').strip()
+            concepto3_id = request.POST.get('concepto_nivel_3', '').strip()
 
-        return redirect('caja_chica')  # Cambia 'caja' por la vista a la que debe redirigir
+            if concepto1_id:
+                try:
+                    item.concepto_nivel_1 = Concepto.objects.get(id=int(concepto1_id))
+                except (Concepto.DoesNotExist, ValueError):
+                    item.concepto_nivel_1 = None
+            else:
+                item.concepto_nivel_1 = None
+
+            if concepto2_id:
+                try:
+                    item.concepto_nivel_2 = Concepto.objects.get(id=int(concepto2_id))
+                except (Concepto.DoesNotExist, ValueError):
+                    item.concepto_nivel_2 = None
+            else:
+                item.concepto_nivel_2 = None
+
+            if concepto3_id:
+                try:
+                    item.concepto_nivel_3 = Concepto.objects.get(id=int(concepto3_id))
+                except (Concepto.DoesNotExist, ValueError):
+                    item.concepto_nivel_3 = None
+            else:
+                item.concepto_nivel_3 = None
+
+            item.save()
+        else:
+            item = get_object_or_404(Ingreso, id=item_id)
+            item.observacion = observacion
+            item.save()
+
+        messages.success(request, f"Se actualizó la observación del {tipo} con ID {item.id}.")
+        return redirect('caja_chica')
     else:
         return JsonResponse({'error': 'Método no permitido'}, status=405)
 
@@ -1018,17 +1543,18 @@ def descargar_excel(request):
         fecha_operacion = ingreso.fecha_operacion.strftime('%d/%m/%Y') if ingreso.fecha_operacion else ''
 
         movimientos.append({
-            'tipo': tipo,
-            'fecha': ingreso.fecha_ingreso.strftime('%-d/%-m/%Y'),
-            'metodo_pago': ingreso.metodo_pago,
-            'concepto': nombre_fondo,
-            'proveedor': ingreso.id_fondo.nombre_fondo,
-            'banco': banco_nombre,
-            'codigo_operacion': codigo_operacion,
-            'fecha_operacion': fecha_operacion,
-            'notas': ingreso.observacion or '',
-            'monto': Decimal(ingreso.importe)
+            'tipo': tipo if tipo else '',
+            'fecha': ingreso.fecha_ingreso.strftime('%-d/%-m/%Y') if ingreso.fecha_ingreso else '',
+            'metodo_pago': ingreso.metodo_pago if ingreso.metodo_pago else '',
+            'concepto': nombre_fondo if nombre_fondo else '',
+            'proveedor': ingreso.id_fondo.nombre_fondo if ingreso.id_fondo and ingreso.id_fondo.nombre_fondo else '',
+            'banco': banco_nombre if banco_nombre else '',
+            'codigo_operacion': codigo_operacion if codigo_operacion else '',
+            'fecha_operacion': fecha_operacion if fecha_operacion else '',
+            'notas': ingreso.observacion if ingreso.observacion else '',
+            'monto': Decimal(ingreso.importe) if ingreso.importe else Decimal('0.00')
         })
+
     for gasto in gastos:
         if gasto.concepto_nivel_3:
             concepto = gasto.concepto_nivel_3.concepto_nombre
@@ -1100,9 +1626,77 @@ def descargar_excel(request):
     wb.save(response)
     return response
 
+
+def transferir_yape(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            item_id = data.get("item_id")
+            monto = data.get("monto")
+
+            # Validar que `item_id` y `monto` existen
+            if not item_id or monto is None:
+                return JsonResponse({"error": "Faltan datos en la solicitud."}, status=400)
+
+            # Convertir monto a Decimal
+            monto = Decimal(monto)
+
+            # Obtener el ingreso
+            ingreso = get_object_or_404(Ingreso, id=item_id)
+
+            # Verificar que el monto no sea mayor que el importe disponible
+            if monto > ingreso.importe:
+                return JsonResponse({"error": "El monto a transferir no puede ser mayor al importe disponible."}, status=400)
+
+            # Actualizar el campo `importe_yape`
+            ingreso.importe_yape += monto
+
+            # Calcular la diferencia y actualizar `importe_efectivo`
+            ingreso.importe_efectivo = ingreso.importe - ingreso.importe_yape
+
+            ingreso.save()
+
+            return JsonResponse({"message": f"Transferencia exitosa. ID: {item_id}, Monto transferido: {monto}, Nuevo efectivo: {ingreso.importe_efectivo}"})
+
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Error al procesar la solicitud. JSON inválido."}, status=400)
+        except Ingreso.DoesNotExist:
+            return JsonResponse({"error": "Ingreso no encontrado."}, status=404)
+        except ValueError:
+            return JsonResponse({"error": "Monto inválido, debe ser un número."}, status=400)
+        except Exception as e:
+            return JsonResponse({"error": f"Error inesperado: {str(e)}"}, status=500)
+
+    return JsonResponse({"error": "Método no permitido."}, status=405)
+
+from django.views.decorators.http import require_POST
+
+@login_required
+@require_POST
+def eliminar_item(request, item_id, item_tipo):
+    if item_tipo == "Gasto":
+        # Buscar el gasto por id y eliminarlo
+        item = get_object_or_404(Gasto, id=item_id)
+        item.delete()
+    else:
+        # Si no es Gasto se asume que es Ingreso, se busca y elimina
+        item = get_object_or_404(Ingreso, id=item_id)
+        item.delete()
+
+    messages.success(request, f"Eliminado correctamente: ID {item_id}, Tipo {item_tipo}")
+    return redirect("caja_chica")
+
+
 @login_required
 def caja_chica(request):
     hoy = date.today().strftime('%Y-%m-%d')  # Formato para los campos de tipo date
+    usuario = request.user
+    hoy1 = date.today()
+
+    saldo_inicial = usuario.saldo_inicial  # Gracias a related_name="saldo_inicial"
+    if saldo_inicial.fecha_cierre and saldo_inicial.fecha_cierre < hoy1:
+        saldo_inicial.caja_cerrada = False  # Cerrar caja si la fecha de cierre es antigua
+        saldo_inicial.save()
 
     # Obtener las fechas de los parámetros GET, si no están presentes usar la fecha de hoy
     fecha_inicio = request.GET.get('fecha_inicio', hoy)
@@ -1117,23 +1711,38 @@ def caja_chica(request):
     try:
         saldo_inicial = SaldoInicial.objects.get(usuario=request.user)
         saldo_base = saldo_inicial.monto_saldo_inicial
+        saldo_yape = saldo_inicial.monto_saldo_inicial_yape
     except SaldoInicial.DoesNotExist:
-        saldo_base = Decimal('0.00')  # Si no tiene saldo inicial, asignar 0
+        saldo_base = Decimal('0.00')
+        saldo_yape = Decimal('0.00')
 
     # Calcular el saldo inicial usando la función personalizada
     saldo_inicial = obtener_saldo_inicial_manual(fecha_inicio, usuario=request.user if not request.user.is_staff else None)
     # Sumar el saldo base al saldo inicial
     saldo_inicial += saldo_base
+    saldo_inicial += saldo_yape
     saldo_efectivo = 0
     saldo_banco = 0
     if not request.user.is_staff:
         # Filtrar los ingresos y gastos del usuario autenticado sin límite de fechas
-        ingresos = Ingreso.objects.filter(usuario_creador=request.user)
+        ingresos = Ingreso.objects.filter(usuario_creador=request.user).exclude(metodo_pago="Sin especificar")
         gastos = Gasto.objects.filter(usuario_creador=request.user)
 
-        # Calcular saldo efectivo y saldo banco para el usuario no staff
-        saldo_efectivo = sum(ingreso.importe for ingreso in ingresos if ingreso.metodo_pago == 'efectivo') - sum(gasto.importe for gasto in gastos if gasto.tipo_pago == 'efectivo')
-        saldo_banco = sum(ingreso.importe for ingreso in ingresos if ingreso.metodo_pago != 'efectivo') - sum(gasto.importe for gasto in gastos if gasto.tipo_pago != 'efectivo')
+        # Separar ingresos en dos listas según importe_yape
+        ingresos_efectivo = [ingreso.importe if ingreso.importe_yape == 0 else ingreso.importe_efectivo for ingreso in ingresos if ingreso.metodo_pago == "efectivo"]
+        ingresos_banco = [ingreso.importe for ingreso in ingresos if ingreso.metodo_pago != "efectivo"]
+        ingresos_yape = [ingreso.importe_yape for ingreso in ingresos if ingreso.importe_yape != 0]
+
+        # Separar gastos según el tipo de pago
+        gastos_efectivo = [gasto.importe for gasto in gastos if gasto.tipo_pago == "efectivo"]
+        gastos_banco = [gasto.importe for gasto in gastos if gasto.tipo_pago != "efectivo"]
+
+        # Calcular saldo efectivo
+        saldo_efectivo = saldo_base + sum(ingresos_efectivo) - sum(gastos_efectivo)
+
+        # Calcular saldo banco
+        saldo_banco = saldo_yape + sum(ingresos_banco) + sum(ingresos_yape) - sum(gastos_banco)
+
 
 
     # Verificar si el usuario es staff
@@ -1172,7 +1781,10 @@ def caja_chica(request):
             'monto': Decimal(ingreso.importe),
             'moneda': ingreso.moneda,
             'proveedor': ingreso.id_fondo.nombre_fondo if ingreso.id_fondo else "Sin fondo especifico",
-            'usuario_creador': ingreso.usuario_creador.username if ingreso.usuario_creador else "Desconocido"
+            'usuario_creador': ingreso.usuario_creador.username if ingreso.usuario_creador else "Desconocido",
+            'transferir_yape':ingreso.importe_yape,
+            'eliminar': "Si" if ingreso.fecha_ingreso == hoy1 else "No"
+
         })
 
     # Procesar gastos
@@ -1200,10 +1812,16 @@ def caja_chica(request):
             'monto': Decimal(gasto.importe),
             'rendido': gasto.rendido,
             'moneda': gasto.moneda,
-            'proveedor': gasto.nombre_proveedor.razon_social,
+            'proveedor': gasto.nombre_proveedor.razon_social if gasto.nombre_proveedor and gasto.nombre_proveedor.razon_social else "No hay razón social",
             'rendiciones': list(gasto.rendiciones_gasto.all()),
             'total_rendido': total_rendido,  # ✅ Agregar el total de rendiciones
-            'usuario_creador': gasto.usuario_creador.username
+            'usuario_creador': gasto.usuario_creador.username,
+            'concepto_nivel_1_id': gasto.concepto_nivel_1.id if gasto.concepto_nivel_1 else "",
+            'concepto_nivel_2_id': gasto.concepto_nivel_2.id if gasto.concepto_nivel_2 else "",
+            'concepto_nivel_3_id': gasto.concepto_nivel_3.id if gasto.concepto_nivel_3 else "",
+            'tipo_item':gasto.tipo_comprobante,
+            'Eliminar': "Si" if gasto.fecha_gasto == hoy1 else "No"
+
         })
 
     # Cálculos para los totales
@@ -1213,7 +1831,9 @@ def caja_chica(request):
 
     # Generar el título para las fechas seleccionadas
     rango_fechas = f"{fecha_inicio.strftime('%d/%m/%Y')} - {fecha_fin.strftime('%d/%m/%Y')}"
-
+    nivel_1_conceptos = Concepto.objects.filter(nivel=1)
+    nivel_2_conceptos = Concepto.objects.filter(nivel=2)
+    nivel_3_conceptos = Concepto.objects.filter(nivel=3)
     # Contexto para la plantilla
     context = {
         'movimientos': movimientos,
@@ -1227,12 +1847,25 @@ def caja_chica(request):
         'rango_fechas': rango_fechas,
         'saldo_efectivo': saldo_efectivo,
         'saldo_banco': saldo_banco,
+        'nivel_1_conceptos': nivel_1_conceptos,
+        'nivel_2_conceptos': nivel_2_conceptos,
+        'nivel_3_conceptos': nivel_3_conceptos,
     }
 
     return render(request, 'caja.html', context)
 
 
 
+
+
+
+
+
+
+def verificar_gastos(request, proveedor_id):
+    """Verifica si un proveedor tiene gastos antes de eliminarlo"""
+    tiene_gastos = Gasto.objects.filter(nombre_proveedor_id=proveedor_id).exists()
+    return JsonResponse({'tiene_gastos': tiene_gastos})
 
 def cuentas_bancarias(request, proveedor_id):
     proveedor = Proveedor.objects.get(id=proveedor_id)
@@ -1563,12 +2196,15 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
+            if user.username == "naye123":
+                return redirect('ver_personal')
             return redirect('dashboard')  # Redirige a la vista del dashboard
         else:
             messages.error(request, "Nombre de usuario o contraseña incorrectos.")
             return redirect('login')
 
     return render(request, 'login.html')
+
 
 from django.db.models.functions import TruncMonth
 
@@ -1617,7 +2253,13 @@ def dashboard_view(request):
         today = date.today()
         current_year = today.year
         current_month = today.month
+        usuario = request.user
+        hoy1 = date.today()
 
+        saldo_inicial = usuario.saldo_inicial  # Gracias a related_name="saldo_inicial"
+        if saldo_inicial.fecha_cierre and saldo_inicial.fecha_cierre < hoy1:
+            saldo_inicial.caja_cerrada = False  # Cerrar caja si la fecha de cierre es antigua
+            saldo_inicial.save()
         # Si el usuario es staff, no filtramos los gastos por usuario_creador
         if request.user.is_staff:
             # Si es staff, no filtramos los gastos por usuario logueado
@@ -1705,6 +2347,164 @@ def dashboard_view(request):
     else:
         return redirect('login')
 
+def reporte_concepto_proveedor_pdf(request):
+    if request.method == "POST":
+        # Recoger datos del formulario (inputs de tipo month: formato "YYYY-MM")
+        proveedor_id = request.POST.get("proveedor")
+        concepto_nivel_1 = request.POST.get("concepto_nivel_1")  # Puede ser 'todos' o un ID
+        fecha_inicio = request.POST.get("fecha_inicio")
+        fecha_final = request.POST.get("fecha_final")
+
+        # Validar que se reciban todos los datos necesarios
+        if not all([proveedor_id, concepto_nivel_1, fecha_inicio, fecha_final]):
+            messages.error(request, "Faltan datos para generar el reporte.")
+            return redirect("reportes")
+
+        try:
+            # Convertir las cadenas "YYYY-MM" en fechas: primer día del mes y último día del mes
+            fecha_inicio_dt = datetime.strptime(fecha_inicio, "%Y-%m").date().replace(day=1)
+            import calendar
+            year_final, month_final = map(int, fecha_final.split('-'))
+            last_day = calendar.monthrange(year_final, month_final)[1]
+            fecha_final_dt = datetime.strptime(fecha_final, "%Y-%m").date().replace(day=last_day)
+        except Exception:
+            messages.error(request, "Formato de fecha incorrecto.")
+            return redirect("reportes")
+
+        try:
+            proveedor = Proveedor.objects.get(pk=proveedor_id)
+        except Proveedor.DoesNotExist:
+            messages.error(request, "Proveedor no encontrado.")
+            return redirect("reportes")
+
+        # Obtener registros de Gastos para el proveedor en el rango de fechas
+        gastos_qs = Gasto.objects.filter(
+            nombre_proveedor=proveedor,
+            fecha_gasto__range=[fecha_inicio_dt, fecha_final_dt]
+        )
+        if concepto_nivel_1 != "todos":
+            gastos_qs = gastos_qs.filter(concepto_nivel_1__id=concepto_nivel_1)
+
+        # Obtener registros de Rendiciones para el proveedor en el rango de fechas
+        rendiciones_qs = Rendicion.objects.filter(
+            proveedor=proveedor,
+            fecha_operacion__range=[fecha_inicio_dt, fecha_final_dt]
+        )
+        if concepto_nivel_1 != "todos":
+            rendiciones_qs = rendiciones_qs.filter(concepto_nivel_1__id=concepto_nivel_1)
+
+        # Combinar ambos querysets
+        registros = list(gastos_qs) + list(rendiciones_qs)
+
+        # Ordenar registros por fecha (usando fecha_gasto para Gastos y fecha_operacion para Rendiciones)
+        def get_registro_fecha(reg):
+            if hasattr(reg, "fecha_gasto") and reg.fecha_gasto:
+                return reg.fecha_gasto
+            elif hasattr(reg, "fecha_operacion") and reg.fecha_operacion:
+                return reg.fecha_operacion
+            return datetime.today().date()
+        registros.sort(key=get_registro_fecha)
+
+        # Determinar el texto del concepto
+        if concepto_nivel_1 == "todos":
+            concepto_text = "Todos los Conceptos"
+        else:
+            try:
+                concepto_obj = Concepto.objects.get(pk=concepto_nivel_1)
+                concepto_text = concepto_obj.concepto_nombre
+            except Concepto.DoesNotExist:
+                concepto_text = ""
+
+        # Crear el PDF utilizando ReportLab
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        elements = []
+        styles = getSampleStyleSheet()
+
+        # Definir un estilo para el Paragraph del último concepto que permita el ajuste de línea
+        concepto_style = ParagraphStyle(
+            'ConceptoWrap',
+            parent=styles['BodyText'],
+            fontName='Helvetica',
+            fontSize=10,
+            leading=12,
+            alignment=1  # Centrado
+        )
+
+        # Título del reporte
+        title_text = f"Gasto por concepto '{concepto_text}' del proveedor {proveedor.razon_social}"
+        elements.append(Paragraph(title_text, styles['Title']))
+        elements.append(Spacer(1, 12))
+
+        # Encabezados de la tabla: Fecha, Monto, Último Concepto, Observación/Nota
+        data = [["Fecha", "Monto", "Concepto", "Observaciones"]]
+        total_importe = 0
+
+        for reg in registros:
+            # Obtener la fecha en formato dd/mm/YYYY
+            if hasattr(reg, "fecha_gasto") and reg.fecha_gasto:
+                fecha_str = reg.fecha_gasto.strftime("%d/%m/%Y")
+            elif hasattr(reg, "fecha_operacion") and reg.fecha_operacion:
+                fecha_str = reg.fecha_operacion.strftime("%d/%m/%Y")
+            else:
+                fecha_str = "-"
+
+            # Obtener el monto
+            monto_val = float(reg.importe) if reg.importe else 0
+            total_importe += monto_val
+
+            # Determinar el último concepto asociado:
+            # Se busca primero en nivel 3; si no existe, en nivel 2; de lo contrario, en nivel 1.
+            if hasattr(reg, "concepto_nivel_3") and reg.concepto_nivel_3:
+                ultimo_concepto = reg.concepto_nivel_3.concepto_nombre
+            elif hasattr(reg, "concepto_nivel_2") and reg.concepto_nivel_2:
+                ultimo_concepto = reg.concepto_nivel_2.concepto_nombre
+            elif hasattr(reg, "concepto_nivel_1") and reg.concepto_nivel_1:
+                ultimo_concepto = reg.concepto_nivel_1.concepto_nombre
+            else:
+                ultimo_concepto = "-"
+
+            # Crear un Paragraph para que el texto se envuelva correctamente
+            ultimo_concepto_para = Paragraph(ultimo_concepto, concepto_style)
+
+            # Obtener la observación/nota (se usa 'observacion' en Gasto y 'nota' en Rendicion, si existen)
+            observacion = "-"
+            if hasattr(reg, "observacion") and reg.observacion:
+                observacion = reg.observacion
+            elif hasattr(reg, "nota") and reg.nota:
+                observacion = reg.nota
+
+            data.append([fecha_str, f"{monto_val:,.2f}", ultimo_concepto_para, observacion])
+
+        # Agregar fila de total
+        data.append(["Total", f"{total_importe:,.2f}", "", ""])
+
+        # Crear la tabla con estilos y colores bonitos
+        table = Table(data, colWidths=[80, 80, 150, 220])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#ADD8E6')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0,0), (-1,0), 12),
+            ('GRID', (0,0), (-1,-1), 1, colors.black),
+            ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#D1D5DB')),
+            ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold')
+        ]))
+        elements.append(table)
+
+        # Construir el PDF
+        doc.build(elements)
+        buffer.seek(0)
+
+        response = HttpResponse(buffer, content_type='application/pdf')
+        filename = f"reporte_concepto_{proveedor.razon_social}_{fecha_inicio}_{fecha_final}.pdf"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+    else:
+        messages.error(request, "Método no permitido")
+        return redirect("reportes")
+
 
 
 
@@ -1741,7 +2541,7 @@ def prestamos(request):
             dia_pago = request.POST.get('dia_pago')  # Recibimos el día de pago
             cuota_actual = request.POST.get('cuota_actual') if estado == "proceso" else None
             monto_cuota = request.POST.get('monto_cuota')
-
+            notas=request.POST.get('notas')
             # Validación de datos
             if not all([fecha_prestamo, fecha_vencimiento, numero_cuotas, tea, monto, estado, local_id, dia_pago]):
                 messages.error(request, "Todos los campos son requeridos.")
@@ -1772,25 +2572,26 @@ def prestamos(request):
                 cuota_actual=cuota_actual,
                 local=local,
                 dia_pago=dia_pago,  # Guardamos el día de pago
-                monto_cuota=monto_cuota
+                monto_cuota=monto_cuota,
+                notas=notas
             )
             prestamo.save()
 
-            # Obtener el fondo con nombre 'Fondo Prestamo'
-            fondo = Fondo.objects.filter(nombre_fondo="Fondo Prestamo").first()
+            # Solo crear el ingreso si el estado es "nuevo"
+            if estado == "nuevo":
+                fondo = Fondo.objects.filter(nombre_fondo="Fondo Prestamo").first()
 
-            # Crear el ingreso automáticamente
-            ingreso = Ingreso.objects.create(
-                prestamo=prestamo,
-                fecha_registro=now().date(),
-                fecha_ingreso=now().date(),
-                importe=monto,
-                id_fondo=fondo,
-                metodo_pago="efectivo",
-                moneda="Soles",
-                local=local,  # Se asigna el local
-                observacion="Prestamo"
-            )
+                ingreso = Ingreso.objects.create(
+                    prestamo=prestamo,
+                    fecha_registro=now().date(),
+                    fecha_ingreso=now().date(),
+                    importe=monto,
+                    id_fondo=fondo,
+                    metodo_pago="efectivo",
+                    moneda="Soles",
+                    local=local,  # Se asigna el local
+                    observacion="Prestamo"
+                )
 
             messages.success(request, "Préstamo e ingreso creados exitosamente.")
             return redirect('prestamos')  # Redirigir a la lista de préstamos
@@ -1806,7 +2607,7 @@ def prestamos(request):
         except Exception as e:
             messages.error(request, f"Ocurrió un error: {str(e)}")
 
-        return redirect('crear_prestamo')
+        return redirect('prestamos')
 
     # Obtener proveedores, bancos y locales
     proveedores = Proveedor.objects.all()
@@ -1940,7 +2741,7 @@ def gasto(request):
             concepto_nivel_2 = data.get('concepto_nivel_2')
             concepto_nivel_3 = data.get('concepto_nivel_3')
             numero_comprobante = data.get('num_comprobante')
-            fecha_emision_comprobante = data.get('fecha_emision_comprobante') if tipo_comprobante  in ['RHE', 'Factura', 'Boleta'] else None # Nuevo campo
+            fecha_emision_comprobante = data.get('fecha_emision_comprobante') if tipo_comprobante  in ['RHE', 'Factura', 'Boleta','Nota','Proforma'] else None # Nuevo campo
             campo_area=data.get('campo_area')
             campo_mes=data.get('campo_mes') if tipo_comprobante  in ['Boleta de pago'] else None
             id_requerimiento = data.get('id_requerimiento')  # Nuevo campo
@@ -2064,7 +2865,7 @@ def gasto(request):
 def ver_prestamos(request):
     # Obtener todos los préstamos
     prestamos = Prestamo.objects.all()
-
+    bancos = Banco.objects.all()
     # Agregar la fecha de vencimiento calculada y el estado de las cuotas
     prestamos_data = []
 
@@ -2117,18 +2918,24 @@ def ver_prestamos(request):
             'monto_cuota':prestamo.monto_cuota,
         })
 
-    return render(request, 'ver_prestamos.html', {'prestamos_data': prestamos_data})
-def ficha_ingreso_view(request):
+    return render(request, 'ver_prestamos.html', {'prestamos_data': prestamos_data ,'bancos': bancos  })
 
-    return render(request, "ficha_ingreso.html")
+
+
+def ficha_ingreso_view(request):
+    bancos = Banco.objects.all()
+    return render(request, "ficha_ingreso.html",{'bancos':bancos})
 
 def realizar_pago(request):
     if request.method == 'POST':
         prestamo_id = request.POST.get('prestamo_id', '').strip()
         monto_pagado = request.POST.get('monto_pagado', '').strip()
         fecha_pago = request.POST.get('fecha_pago', '').strip()
+        banco_id = request.POST.get('banco', '').strip()
+        codigo_operacion = request.POST.get('codigo_operacion', '').strip()
+        fecha_operacion = request.POST.get('fecha_operacion', '').strip()
+        nota = request.POST.get('nota', '').strip()  # Captura la nota ingresada
 
-        # Validación de datos
         if not prestamo_id.isdigit():
             messages.error(request, "❌ ID de préstamo inválido.")
             return redirect('ver_prestamos')
@@ -2145,23 +2952,17 @@ def realizar_pago(request):
             messages.error(request, "❌ Monto de pago no válido.")
             return redirect('ver_prestamos')
 
-        # Obtener el préstamo
         prestamo = get_object_or_404(Prestamo, id=int(prestamo_id))
-
-        # Datos del préstamo
         cuota_actual = prestamo.cuota_actual
         monto_cuota = prestamo.monto_cuota
         numero_cuotas = prestamo.numero_cuotas
 
-        # Verificar si ya se pagaron todas las cuotas
         if cuota_actual > numero_cuotas:
             messages.warning(request, "⚠️ Este préstamo ya ha sido cancelado.")
             return redirect('ver_prestamos')
 
-        # Calcular lo que se ha pagado en la cuota actual
         total_pagado = prestamo.pagos.filter(cuota=cuota_actual).aggregate(Sum('monto_pagado'))['monto_pagado__sum'] or Decimal(0)
 
-        # Registrar el nuevo pago
         Pago.objects.create(
             prestamo=prestamo,
             cuota=cuota_actual,
@@ -2169,14 +2970,14 @@ def realizar_pago(request):
             fecha_pago=fecha_pago
         )
 
-        total_pagado += monto_pagado  # Nuevo total de pagos en esta cuota
 
-        # Verificar si la cuota se ha completado
+        total_pagado += monto_pagado
+
         if total_pagado >= monto_cuota:
-            prestamo.cuota_actual += 1  # Avanzar a la siguiente cuota
+            prestamo.cuota_actual += 1
             if prestamo.cuota_actual > numero_cuotas:
-                prestamo.estado = "terminado"  # Marcar como terminado si se pagaron todas las cuotas
-                messages.success(request, f"✅ Pago registrado. ¡Préstamo completado! 🎉")
+                prestamo.estado = "terminado"
+                messages.success(request, "✅ Pago registrado. ¡Préstamo completado! 🎉")
             else:
                 messages.success(request, f"✅ Pago registrado. Cuota {cuota_actual} completada. Próxima cuota: {prestamo.dia_pago} del siguiente mes.")
         else:
@@ -2184,6 +2985,39 @@ def realizar_pago(request):
             messages.warning(request, f"⚠️ Pago parcial registrado. Falta cancelar S/{restante:.2f} para completar la cuota {cuota_actual}.")
 
         prestamo.save()
+        # Obtener o crear el concepto de nivel 1 (PAGO DE PRÉSTAMOS)
+        concepto_nivel_1, created = Concepto.objects.get_or_create(
+                concepto_nombre="PAGO DE PRESTAMOS",
+                nivel=1,
+                id_concepto_padre=None  # Nivel 1 no tiene padre
+            )
+
+            # Obtener o crear el concepto de nivel 2 (PRÉSTAMOS DE TERCEROS) con nivel 1 como padre
+        concepto_nivel_2, created = Concepto.objects.get_or_create(
+                concepto_nombre="PRESTAMOS DE TERCEROS",
+                nivel=2,
+                id_concepto_padre=concepto_nivel_1
+            )
+        # Crear el gasto asociado
+        Gasto.objects.create(
+            usuario_creador=request.user,
+            fecha_gasto=now().date(),
+            prestamo=prestamo,
+            banco_id=banco_id,
+            fecha_operacion=fecha_operacion,
+            codigo_operacion=codigo_operacion,
+            importe=monto_pagado,
+            moneda="Soles",
+            tipo_pago="transferencia",
+            tipo_comprobante="Deposito en cuenta",
+            nombre_proveedor=prestamo.proveedor,  # Asociar el proveedor del préstamo
+            local=prestamo.local,  # Asociar el local del préstamo
+            observacion=nota,  # Se guarda la nota en el gasto también
+            concepto_nivel_1=concepto_nivel_1,
+            concepto_nivel_2=concepto_nivel_2,
+            concepto_nivel_3=None
+        )
+
         return redirect('ver_prestamos')
 
     return HttpResponse(status=405)
@@ -2206,16 +3040,12 @@ def rendicion(request):
     # Obtener la fecha actual
     today = date.today().isoformat()
 
-    if request.user.is_superuser:
-        # Obtener usuarios inactivos
-        usuarios_inactivos = User.objects.filter(is_active=False)
-        # Combinar gastos del superusuario y de usuarios inactivos
+    if request.user.is_superuser or request.user.is_staff:
+        # Si el usuario es superuser o staff, se envían todos los gastos que cumplen las condiciones
         gastos_requerimientos = Gasto.objects.filter(
             Q(tipo_comprobante="Requerimiento") | Q(tipo_comprobante="Sin Requerimiento"),
             rendido=False,
             gasto_origen__isnull=True  # Filtrar por gasto_origen nulo
-        ).filter(
-            usuario_creador__in=[request.user] + list(usuarios_inactivos)
         )
     else:
         # Filtrar por usuario autenticado

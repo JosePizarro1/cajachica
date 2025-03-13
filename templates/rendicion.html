@@ -23,7 +23,12 @@
 
 <main class="container mx-auto py-8">
   <h2 class="text-3xl font-bold mb-6">Registrar Rendición</h2>
-
+<div class="mb-4">
+  <label for="filtro-proveedor" class="font-bold mr-2">Filtrar por proveedor:</label>
+  <select id="filtro-proveedor" class="border border-gray-300 rounded px-2 py-1">
+    <option value="todos">Ver Todos</option>
+  </select>
+</div>
   <!-- Tabla de Gastos -->
   <div class="bg-white shadow-md rounded-lg overflow-hidden">
     <div class="bg-gray-800 text-white p-4">
@@ -45,7 +50,7 @@
         </thead>
         <tbody class="divide-y divide-gray-300">
           {% for gasto in gastos %}
-          <tr class="hover:bg-gray-100">
+    <tr class="hover:bg-gray-100" data-proveedor="{{ gasto.nombre_proveedor|default:"Sin proveedor" }}">
             <td class="px-4 py-2">{{ gasto.nombre_proveedor|default:"Sin proveedor" }}</td>
             <td class="px-4 py-2">REQ N°{{gasto.num_requerimiento}}(Id={{gasto.id_requerimiento}})</td>
             <td class="px-4 py-2">{{ gasto.local.nombre_local }}</td>
@@ -54,19 +59,18 @@
             <td class="px-4 py-2">{{ gasto.observacion|default:"Sin observación" }}</td>
             <td class="px-4 py-2">{{ gasto.importe }}</td>
             <td class="px-4 py-2">
-              {% if gasto.usuario_creador.is_active %}
-                <a href="{% url 'registrar_rendiciones' gasto.id %}" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded text-sm inline-flex items-center">
-                  <!-- Font Awesome icon -->
-                  <i class="fas fa-check-circle mr-1"></i>
-                  Rendir
-                </a>
-              {% else %}
-                <button class="bg-gray-500 text-white font-bold py-1 px-3 rounded text-sm inline-flex items-center cursor-not-allowed" disabled>
-                  <!-- Font Awesome icon -->
-                  <i class="fas fa-ban mr-1"></i>
-                  Rendir (Inactivo)
-                </button>
-              {% endif %}
+{% if gasto.usuario_creador == user %}
+  <a href="{% url 'registrar_rendiciones' gasto.id %}" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded text-sm inline-flex items-center">
+    <i class="fas fa-check-circle mr-1"></i>
+    Rendir
+  </a>
+{% else %}
+  <button class="bg-gray-500 text-white font-bold py-1 px-3 rounded text-sm inline-flex items-center cursor-not-allowed" disabled>
+    <i class="fas fa-ban mr-1"></i>
+    Rendir (Inactivo)
+  </button>
+{% endif %}
+
             </td>
 
 
@@ -77,33 +81,98 @@
     </div>
   </div>
 </main>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    let filtroProveedor = document.getElementById("filtro-proveedor");
+    let tabla = document.getElementById("tabla-gastos");
+    let filas = tabla.getElementsByTagName("tr");
 
+    // Obtener proveedores únicos
+    let proveedores = new Set();
+    for (let i = 1; i < filas.length; i++) { // Saltamos la cabecera
+      let proveedor = filas[i].getAttribute("data-proveedor");
+      if (proveedor) proveedores.add(proveedor);
+    }
+
+    // Llenar el select con proveedores únicos
+    proveedores.forEach(proveedor => {
+      let option = document.createElement("option");
+      option.value = proveedor;
+      option.textContent = proveedor;
+      filtroProveedor.appendChild(option);
+    });
+
+    // Filtrar la tabla según el proveedor seleccionado
+    filtroProveedor.addEventListener("change", function () {
+      let seleccion = this.value;
+      for (let i = 1; i < filas.length; i++) {
+        let fila = filas[i];
+        let proveedor = fila.getAttribute("data-proveedor");
+        if (seleccion === "todos" || proveedor === seleccion) {
+          fila.style.display = "";
+        } else {
+          fila.style.display = "none";
+        }
+      }
+    });
+  });
+</script>
 <script>
   $(document).ready(function() {
-    $('#tabla-gastos').DataTable({
+    var table = $('#tabla-gastos').DataTable({
       "language": {
         "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
       },
-      "order": [[1, "desc"]], // Ordenar por Fecha de Gasto de mayor a menor
-      "pagingType": "simple_numbers", // Control de paginación más compacto
-      "dom": '<"top"lfB>rt<"bottom"ip><"clear">', // Agregar botones de exportación
+      "order": [[1, "desc"]],
+      "pagingType": "simple_numbers",
+      "dom": '<"top"lfB>rt<"bottom"ip><"clear">',
       "buttons": [
         {
           extend: 'excelHtml5',
           text: 'Exportar a Excel',
           className: 'bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded',
-          title: 'Reporte de Gastos'
+          title: 'Reporte de Gastos',
+          exportOptions: {
+            columns: ':not(:last-child)' // Excluye la última columna
+          }
         },
         {
           extend: 'pdfHtml5',
           text: 'Exportar a PDF',
-          className: 'bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded',
+          className: 'bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded',
           title: 'Reporte de Gastos',
           orientation: 'landscape',
-          pageSize: 'A4'
+          pageSize: 'A4',
+          exportOptions: {
+            columns: ':not(:last-child)' // Excluye la última columna
+          },
+          customize: function(doc) {
+            doc.styles.tableHeader = { fillColor: '#3B82F6', color: 'white', alignment: 'center' };
+            doc.styles.title = { fontSize: 14, bold: true, alignment: 'center', color: '#1E3A8A' };
+            doc.defaultStyle.alignment = 'center';
+            doc.styles.tableBodyOdd = { fillColor: '#E3F2FD' };
+            doc.styles.tableBodyEven = { fillColor: '#FFFFFF' };
+            doc.content[1].table.widths = Array(doc.content[1].table.body[0].length + 1).join('*').split('');
+          }
         }
       ]
     });
+
+    table.buttons().container().appendTo('#buttons-container');
+
+    // Filtro de proveedores
+    $('#filtro-proveedor').on('change', function() {
+        var seleccion = this.value;
+        if (seleccion === "todos") {
+            table.search('').draw(); // Restablece la búsqueda
+        } else {
+            table.search(seleccion).draw(); // Filtra la tabla con DataTables
+        }
+    });
+
+    // Redibuja la tabla cuando cambia el filtro
+    table.draw();
+
   });
 </script>
 

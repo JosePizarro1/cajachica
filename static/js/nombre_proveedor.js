@@ -18,7 +18,7 @@ $(document).ready(function () {
     // Mostrar/Ocultar campos din¨¢micos para Factura, Boleta o RHE
 
     TipoSelect.addEventListener('change', () => {
-      if (TipoSelect.value === 'Boleta' || TipoSelect.value === 'RHE' || TipoSelect.value === 'Factura') {
+      if (TipoSelect.value === 'Boleta' || TipoSelect.value === 'RHE' || TipoSelect.value === 'Factura' || TipoSelect.value === 'Nota' || TipoSelect.value === 'Proforma' ) {
         codigoComprobanteContainer.style.display = 'block';
         fechaComprobanteContainer.style.display = 'block';
       } else {
@@ -75,18 +75,23 @@ $(document).ready(function () {
         campoMesContainer.style.display = 'none';
 
       }
-      // Mostrar/Ocultar campos para Deposito en cuenta
-      if (TipoSelect.value === 'Deposito en cuenta') {
-        // Mostrar los campos relacionados con "Deposito en cuenta"
-        codigoOperacionContainer.style.display = 'block';
-        fechaOperacionContainer.style.display = 'block';
-        BancoContainer.style.display = 'block'; // Mostrar el campo Banco
-      } else {
-        // Ocultar los campos relacionados con "Deposito en cuenta"
-        codigoOperacionContainer.style.display = 'none';
-        fechaOperacionContainer.style.display = 'none';
-        BancoContainer.style.display = 'none'; // Ocultar el campo Banco
-      }
+        if (TipoSelect.value === 'Deposito en cuenta') {
+            codigoOperacionContainer.style.display = 'block';
+            fechaOperacionContainer.style.display = 'block';
+            BancoContainer.style.display = 'block';
+
+            // Cambia el método de pago a "Transferencia" y lo hace de solo lectura
+            metodoPagoSelect.value = 'transferencia';
+            metodoPagoSelect.setAttribute('readonly', true);
+        } else {
+            codigoOperacionContainer.style.display = 'none';
+            fechaOperacionContainer.style.display = 'none';
+            BancoContainer.style.display = 'none';
+
+            // Restablece el método de pago a "Efectivo" y lo hace editable nuevamente
+            metodoPagoSelect.value = 'efectivo';
+            metodoPagoSelect.removeAttribute('readonly');
+        }
 
     });
 

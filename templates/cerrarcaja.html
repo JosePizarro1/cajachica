@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mx-auto p-6">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Usuarios con Caja</h2>
+        <button onclick="abrirModal()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center">
+            <i class="fas fa-user-plus mr-2"></i> Agregar Usuario
+        </button>
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <table class="w-full border-collapse">
+            <thead class="bg-gray-200">
+                <tr>
+                    <th class="py-3 px-6 text-left">Usuario</th>
+                    <th class="py-3 px-6 text-center">Estado de Caja</th>
+                    <th class="py-3 px-6 text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                    <tr class="border-b">
+                        <td class="py-4 px-6">{{ usuario.username }}</td>
+                        <td class="py-4 px-6 text-center">
+                            {% if usuario.saldo_inicial.caja_cerrada %}
+                                <span class="px-3 py-1 bg-red-100 text-red-600 text-sm font-semibold rounded-lg">Caja Cerrada</span>
+                            {% else %}
+                                <span class="px-3 py-1 bg-green-100 text-green-600 text-sm font-semibold rounded-lg">Caja Abierta</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-4 px-6 text-center">
+                            {% if usuario.saldo_inicial.caja_cerrada %}
+                                <!-- Botón para Reactivar Caja -->
+                                <button onclick="confirmarReactivacion('{{ usuario.id }}', '{{ usuario.username }}')"
+                                    class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 flex items-center justify-center mx-auto">
+                                    <i class="fas fa-unlock mr-2"></i> Reactivar Caja
+                                </button>
+                            {% else %}
+                                <!-- Botón para Cerrar Caja -->
+                                <button onclick="confirmarCierre('{{ usuario.id }}', '{{ usuario.username }}')"
+                                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 flex items-center justify-center mx-auto">
+                                    <i class="fas fa-lock mr-2"></i> Cerrar Caja
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3" class="py-4 px-6 text-center text-gray-500">No hay usuarios con caja abierta.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<!-- Modal para agregar usuario -->
+<div id="modalUsuario" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+        <h2 class="text-xl font-bold mb-4">Agregar Nuevo Usuario</h2>
+        <label class="block mb-2">Usuario</label>
+        <input id="username" type="text" class="w-full px-3 py-2 border rounded mb-3" placeholder="Nombre de usuario">
+
+        <label class="block mb-2">Contraseña</label>
+        <input id="password" type="password" class="w-full px-3 py-2 border rounded mb-3" placeholder="Contraseña">
+
+        <label class="block mb-2">Saldo Inicial (Efectivo)</label>
+        <input id="saldoEfectivo" type="number" step="0.01" class="w-full px-3 py-2 border rounded mb-3" placeholder="Saldo inicial efectivo">
+
+        <label class="block mb-2">Saldo Inicial (Yape)</label>
+        <input id="saldoYape" type="number" step="0.01" class="w-full px-3 py-2 border rounded mb-4" placeholder="Saldo inicial Yape">
+
+        <div class="flex justify-between">
+            <button onclick="cerrarModal()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">Cancelar</button>
+            <button onclick="registrarUsuario()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Registrar</button>
+        </div>
+    </div>
+</div>
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+function getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+function abrirModal() {
+    document.getElementById('modalUsuario').classList.remove('hidden');
+}
+function cerrarModal() {
+    document.getElementById('modalUsuario').classList.add('hidden');
+}
+// Registrar usuario con saldo inicial
+function registrarUsuario() {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const saldoEfectivo = document.getElementById('saldoEfectivo').value;
+    const saldoYape = document.getElementById('saldoYape').value;
+
+    if (!username || !password || !saldoEfectivo || !saldoYape) {
+        Swal.fire("Error", "Todos los campos son obligatorios.", "error");
+        return;
+    }
+
+    fetch("/registrar-usuario/", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password,
+            saldo_efectivo: saldoEfectivo,
+            saldo_yape: saldoYape
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire("Éxito", data.message, "success").then(() => {
+                cerrarModal();
+                location.reload();
+            });
+        } else {
+            Swal.fire("Error", data.message, "error");
+        }
+    });
+}
+function confirmarCierre(userId, username) {
+    Swal.fire({
+        title: "¿Cerrar caja de " + username + "?",
+        text: "Esto impedirá que agregue ingresos o gastos hasta mañana.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Sí, cerrar caja"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`/cerrar-caja-usuario/${userId}/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire("Cerrada", data.message, "success").then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire("Error", data.message, "error");
+                }
+            });
+        }
+    });
+}
+
+function confirmarReactivacion(userId, username) {
+    Swal.fire({
+        title: "¿Reactivar caja de " + username + "?",
+        text: "El usuario podrá agregar ingresos y gastos nuevamente.",
+        icon: "info",
+        showCancelButton: true,
+        confirmButtonColor: "#3085d6",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Sí, reactivar caja"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`/reactivar-caja-usuario/${userId}/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    Swal.fire("Reactivada", data.message, "success").then(() => {
+                        location.reload();
+                    });
+                } else {
+                    Swal.fire("Error", data.message, "error");
+                }
+            });
+        }
+    });
+}
+</script>
+
+{% endblock %}

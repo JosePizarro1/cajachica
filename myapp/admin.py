@@ -82,11 +82,27 @@ class RendicionAdmin(admin.ModelAdmin):
         'gasto'
     )
 
-# Registro del modelo Gasto
 @admin.register(Gasto)
 class GastoAdmin(admin.ModelAdmin):
-    list_display = ('fecha_gasto','usuario_creador','importe','rendido','fecha_gasto', 'local', 'tipo_comprobante', 'tipo_pago', 'observacion')
-    list_filter = ('local', 'tipo_comprobante', 'tipo_pago','rendido')
+    list_display = (
+        'id',
+        'fecha_gasto',
+        'proveedor',  # Muestra la razón social del proveedor
+        'usuario_creador',
+        'importe',
+        'rendido',
+        'local',
+        'tipo_comprobante',
+        'tipo_pago',
+        'observacion'
+    )
+    list_filter = ('local', 'tipo_comprobante', 'tipo_pago', 'rendido')
+
+    def proveedor(self, obj):
+        return obj.nombre_proveedor.razon_social if obj.nombre_proveedor else "-"
+
+    proveedor.short_description = "Proveedor"  # Nombre de la columna en el admin
+
 
 @admin.register(Ingreso)
 class IngresoAdmin(admin.ModelAdmin):

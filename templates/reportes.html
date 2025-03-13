@@ -90,44 +90,161 @@
     <div class="flex flex-col sm:flex-row justify-center gap-4">
         <!-- Reporte Anual -->
         <a id="reporteAnual"
-            href="{% url 'reporte_anual' %}"
-            class="px-6 py-3 bg-green-600 text-white font-medium rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-300">
+           href="{% url 'reporte_anual' %}"
+           class="px-6 py-3 bg-green-600 text-white font-medium rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-300">
             Reporte Anual
         </a>
 
-        <!-- Reporte Mensual (Formulario POST con mes requerido) -->
-        <form id="formReporteMensual" method="post" action="{% url 'reporte_mensual' %}" class="flex items-center gap-2">
+        <!-- Reporte Mensual (Formulario POST con rango de meses) -->
+        <form id="formReporteMensual" method="post" action="{% url 'reporte_mensual' %}" class="flex flex-col sm:flex-row items-center gap-4">
             {% csrf_token %}
-            <label for="mes" class="text-sm font-medium text-gray-700">Seleccionar Mes:</label>
-            <select id="mes" name="mes" required class="border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
-                <option value="">Seleccione...</option>
-                <option value="01">Enero</option>
-                <option value="02">Febrero</option>
-                <option value="03">Marzo</option>
-                <option value="04">Abril</option>
-                <option value="05">Mayo</option>
-                <option value="06">Junio</option>
-                <option value="07">Julio</option>
-                <option value="08">Agosto</option>
-                <option value="09">Septiembre</option>
-                <option value="10">Octubre</option>
-                <option value="11">Noviembre</option>
-                <option value="12">Diciembre</option>
-            </select>
-            <button
-                type="submit"
-                class="px-4 py-2 bg-blue-600 text-white font-medium rounded-md shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-300">
+            <div class="flex items-center gap-2">
+                <label for="mes_inicio" class="text-sm font-medium text-gray-700">Mes Inicio:</label>
+                <select id="mes_inicio" name="mes_inicio" required class="border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Seleccione...</option>
+                    <option value="01">Enero</option>
+                    <option value="02">Febrero</option>
+                    <option value="03">Marzo</option>
+                    <option value="04">Abril</option>
+                    <option value="05">Mayo</option>
+                    <option value="06">Junio</option>
+                    <option value="07">Julio</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="mes_fin" class="text-sm font-medium text-gray-700">Mes Fin:</label>
+                <select id="mes_fin" name="mes_fin" required class="border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">Seleccione...</option>
+                    <option value="01">Enero</option>
+                    <option value="02">Febrero</option>
+                    <option value="03">Marzo</option>
+                    <option value="04">Abril</option>
+                    <option value="05">Mayo</option>
+                    <option value="06">Junio</option>
+                    <option value="07">Julio</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-medium rounded-md shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-300">
                 Reporte Mensual
             </button>
         </form>
     </div>
 </div>
+
+
+<div class="container mx-auto mt-6 p-6 bg-white shadow rounded">
+    <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">Generar Reporte de Proveedores</h2>
+    <div class="flex flex-col sm:flex-row justify-center gap-4">
+        <select id="proveedor" name="proveedor" class="w-64 border-gray-300 rounded-md p-2 ">
+            <option value="">Seleccione un Proveedor</option>
+            {% for proveedor in proveedores %}
+                <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+            {% endfor %}
+        </select>
+        <a id="btnReporteProveedorPDF" href="#" class="px-6 py-3 bg-red-600 text-white font-medium rounded-md shadow">
+            Gastos del Mes (PDF)
+        </a>
+        <a id="btnReporteProveedorExcel" href="#" class="px-6 py-3 bg-green-600 text-white font-medium rounded-md shadow">
+            Gastos del Mes (Excel)
+        </a>
+    </div>
+</div>
+
+<div class="container mx-auto mt-6 p-6 bg-white shadow rounded">
+    <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">Generar Reporte por Concepto/Proveedor</h2>
+    <form id="formReporteConceptoProveedor" method="post" action="{% url 'reporte_concepto_proveedor_pdf' %}" class="space-y-6">
+        {% csrf_token %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Proveedor -->
+            <div class="flex flex-col">
+                <label for="proveedor" class="block text-sm font-medium text-gray-700 mb-2">Proveedor:</label>
+                <select id="proveedor_prove" name="proveedor" class="w-full border-gray-300 rounded-md p-2">
+                    <option value="">Seleccione un Proveedor</option>
+                    {% for proveedor in proveedores %}
+                        <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Concepto Nivel 1 -->
+            <div class="flex flex-col">
+                <label for="concepto_nivel_1_prove" class="block text-sm font-medium text-gray-700 mb-2">Concepto Nivel 1:</label>
+                <select id="concepto_nivel_1_prove" name="concepto_nivel_1" class="w-full border-gray-300 rounded-md p-2">
+                    <option value="todos">Todos los Conceptos Nivel 1</option>
+                    {% for concepto in conceptos_nivel_1 %}
+                        <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Mes de Inicio -->
+            <div class="flex flex-col">
+                <label for="fecha_inicio" class="block text-sm font-medium text-gray-700 mb-2">Mes de Inicio:</label>
+                <input type="month" id="fecha_inicio" name="fecha_inicio" class="w-full border-gray-300 rounded-md p-2" />
+            </div>
+
+            <!-- Mes Final -->
+            <div class="flex flex-col">
+                <label for="fecha_final" class="block text-sm font-medium text-gray-700 mb-2">Mes Final:</label>
+                <input type="month" id="fecha_final" name="fecha_final" class="w-full border-gray-300 rounded-md p-2" />
+            </div>
+        </div>
+
+        <!-- Botón para generar el reporte -->
+        <div class="flex justify-center mt-4">
+            <button type="submit" class="px-6 py-3 bg-blue-600 text-white font-medium rounded-md shadow hover:bg-blue-700">
+                Generar Reporte
+            </button>
+        </div>
+    </form>
+</div>
+
+
 <script src="{% static 'js/reporteexcel.js' %}" ></script>
 <script>
 
 $(document).ready(function() {
     $('#concepto_nivel_2').select2();
     $('#concepto_nivel_1').select2();
+    $('#concepto_nivel_1_prove').select2();
+    $('#proveedor_prove').select2();
+
+
+
+    $('#proveedor').select2();
+
+        $('#btnReporteProveedorPDF').click(function(e) {
+            e.preventDefault();
+            var proveedorId = $('#proveedor').val();
+            if (!proveedorId) {
+                alert('Seleccione un proveedor');
+                return false;
+            }
+            var url = "{% url 'reporte_proveedor_pdf' %}?proveedor=" + proveedorId;
+            window.location.href = url;
+        });
+
+        $('#btnReporteProveedorExcel').click(function(e) {
+            e.preventDefault();
+            var proveedorId = $('#proveedor').val();
+            if (!proveedorId) {
+                alert('Seleccione un proveedor');
+                return false;
+            }
+            var url = "{% url 'reporte_proveedor_excel' %}?proveedor=" + proveedorId;
+            window.location.href = url;
+        });
+
 });
 
 
@@ -196,6 +313,10 @@ $('#formReporte').on('submit', function(event) {
         }
     });
 });
+$("#formReporteConceptoProveedor").on("submit", function() {
+    $("#btnGenerarReporte").prop("disabled", true);
+    $("#btnGenerarReporte").html("<i class='fas fa-spinner fa-spin'></i> Cargando...");
+});
 
 function generarPDF(data) {
     const { jsPDF } = window.jspdf;
@@ -214,10 +335,11 @@ function generarPDF(data) {
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
     doc.text(`Fecha: ${data.fecha}`, 20, 30); // Posición Y para la fecha del reporte (20, 30)
+
     let yPosition = 40;  // La posición de inicio para la tabla y los títulos del grupo
     data.gastos_por_grupo.forEach(group => {
-        // Definir las columnas de la tabla
-        const columns = ["Proveedor", "Concepto", "Forma de Pago", "Importe", "Fecha"];
+        // Definir las columnas de la tabla, agregando la columna Observación
+        const columns = ["Proveedor", "Concepto", "Forma de Pago", "Importe", "Fecha", "Observación"];
         const tableData = [];
         for (let i = 0; i < group.gastos.length; i++) {
             const gasto = group.gastos[i];
@@ -228,7 +350,8 @@ function generarPDF(data) {
                 gasto.concepto,
                 gasto.forma_pago,
                 importeFormateado,
-                gasto.fecha
+                gasto.fecha,
+                gasto.observacion  // Nueva columna: Observación
             ]);
         }
         doc.setFontSize(14);
@@ -248,6 +371,7 @@ function generarPDF(data) {
     doc.text(totalText, 20, yPosition); // Imprime el total en la posición X=20, Y= después de la última tabla
     doc.save("reporte_gastos.pdf");
 }
+
 
 
     document.addEventListener("DOMContentLoaded", function () {

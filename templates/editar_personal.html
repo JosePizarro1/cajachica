@@ -103,6 +103,29 @@
                         <option value="deposito" {% if personal.tipo_pago == "deposito" %}selected{% endif %}>Depósito</option>
                     </select>
                 </div>
+
+                <div class="row mt-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Nombre del Banco</label>
+                        <select class="form-control" name="nombre_cuenta">
+                            <option value="">Seleccione un banco</option>
+                            {% for banco in bancos %}
+                                <option value="{{ banco.id }}" {% if banco.nombre == personal.nombre_cuenta %}selected{% endif %}>
+                                    {{ banco.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">N° de Cuenta</label>
+                        <input type="text" class="form-control" name="numero_cuenta" value="{{ personal.numero_cuenta }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">CCI (Código de Cuenta Interbancario)</label>
+                        <input type="text" class="form-control" name="cci" value="{{ personal.cci }}">
+                    </div>
+                </div>
+
                 <div class="mt-3">
                     <label class="form-label">Asignación Familiar</label>
                     <input type="checkbox" class="form-check-input" name="asignacion_familiar" {% if personal.asignacion_familiar %}checked{% endif %}>
@@ -126,12 +149,14 @@
 
                 <label class="form-label">Régimen de Aseg. de Salud</label>
                 <select class="form-select" name="regimen_salud">
+                     <option value="ninguno" {% if personal.regimen_salud == "ninguno" %}selected{% endif %}>Ninguno</option>
                     <option value="essalud" {% if personal.regimen_salud == "essalud" %}selected{% endif %}>EsSalud</option>
                     <option value="sis" {% if personal.regimen_salud == "sis" %}selected{% endif %}>SIS</option>
                 </select>
 
                 <label class="form-label mt-3">Régimen Pensionario</label>
                 <select class="form-select" name="regimen_pensionario">
+                    <option value="ninguno" {% if personal.regimen_pensionario == "ninguno" %}selected{% endif %}>Ninguno</option>
                     <option value="onp" {% if personal.regimen_pensionario == "onp" %}selected{% endif %}>ONP</option>
                     <option value="afp" {% if personal.regimen_pensionario == "afp" %}selected{% endif %}>AFP</option>
                 </select>
@@ -161,6 +186,52 @@
                 <label class="form-label mt-3">Año de Egreso</label>
                 <input type="text" class="form-control" name="ano_egreso" value="{{personal.ano_egreso|default_if_none:'' }}">
             </div>
+            <!-- Horario de Trabajo -->
+            <div class="form-section">
+                <h3>5. Horario de Trabajo</h3>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Lunes - Sábado</th>
+                                <th>Hora de Inicio</th>
+                                <th>Hora de Fin</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Turno Mañana</strong></td>
+                                <td>
+                                    <input type="time" class="form-control" name="turno_manana_inicio"
+                                           value="{{ personal.turno_manana_inicio|default:'' }}">
+                                </td>
+                                <td>
+                                    <input type="time" class="form-control" name="turno_manana_fin"
+                                           value="{{ personal.turno_manana_fin|default:'' }}">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Turno Tarde</strong></td>
+                                <td>
+                                    <input type="time" class="form-control" name="turno_tarde_inicio"
+                                           value="{{ personal.turno_tarde_inicio|default:'' }}">
+                                </td>
+                                <td>
+                                    <input type="time" class="form-control" name="turno_tarde_fin"
+                                           value="{{ personal.turno_tarde_fin|default:'' }}">
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                        <!-- Observaciones -->
+<div class="mt-3">
+    <label for="observaciones" class="form-label"><strong>Observaciones</strong></label>
+    <textarea class="form-control" id="observaciones" name="observaciones" rows="4">{{ personal.observacion}}</textarea>
+</div>
+
+            </div>
+
 
 
             <button type="submit" class="btn btn-primary w-100 mt-3">Enviar</button>

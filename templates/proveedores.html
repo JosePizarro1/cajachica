@@ -14,9 +14,9 @@
     <!-- SweetAlert -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
 
-<div class="container mx-auto mt-8">
+    <div class="container mx-auto mt-8">
     <h1 class="text-3xl font-bold mb-6 text-center text-gray-700">Lista de Proveedores</h1>
 
     <div class="mb-6 text-center">
@@ -53,13 +53,13 @@
                                 class="text-blue-600 hover:text-blue-800">
                             <i class="fas fa-edit"></i>
                         </button>
-                        
+
                         <!-- Botón para eliminar proveedor -->
                         <button onclick="confirmDelete('{{ proveedor.id }}', '{{ proveedor.razon_social }}')"
                                 class="text-red-600 hover:text-red-800">
                             <i class="fas fa-trash-alt text-lg"></i>
                         </button>
-                    
+
                         <!-- Botón para agregar cuenta bancaria -->
                         <button onclick="openCuentaBancariaModal('{{ proveedor.id }}')"
                                 class="text-green-600 hover:text-green-800">
@@ -68,7 +68,7 @@
                         <!-- Botón para ver las cuentas bancarias -->
                         <button onclick="openVerCuentasModal('{{ proveedor.id }}')"
                                 class="text-gray-600 hover:text-gray-800">
-                            <i class="fas fa-wallet"></i> 
+                            <i class="fas fa-wallet"></i>
                         </button>
 
                     </td>
@@ -142,40 +142,40 @@
             <!-- RUC/DNI -->
             <div class="mb-4">
                 <label for="ruc_dni" class="block text-gray-700 font-bold mb-2">RUC/DNI:</label>
-                <input type="text" id="ruc_dni" name="ruc_dni" required 
+                <input type="text" id="ruc_dni" name="ruc_dni" required
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
             </div>
             <!-- Razón Social -->
             <div class="mb-4">
                 <label for="razon_social" class="block text-gray-700 font-bold mb-2">Razón Social:</label>
-                <input type="text" id="razon_social" name="razon_social" required 
+                <input type="text" id="razon_social" name="razon_social" required
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
             </div>
             <!-- Nombre Comercial -->
             <div class="mb-4">
                 <label for="nombre_comercial" class="block text-gray-700 font-bold mb-2">Nombre Comercial (opcional):</label>
-                <input type="text" id="nombre_comercial" name="nombre_comercial" 
+                <input type="text" id="nombre_comercial" name="nombre_comercial"
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
             </div>
             <!-- Teléfono -->
             <div class="mb-4">
                 <label for="telefono" class="block text-gray-700 font-bold mb-2">Teléfono:</label>
-                <input type="text" id="telefono" name="telefono" 
+                <input type="text" id="telefono" name="telefono"
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
             </div>
             <!-- Nombre de Contacto -->
             <div class="mb-4">
                 <label for="nombre_contacto" class="block text-gray-700 font-bold mb-2">Nombre de Contacto:</label>
-                <input type="text" id="nombre_contacto" name="nombre_contacto" 
+                <input type="text" id="nombre_contacto" name="nombre_contacto"
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
             </div>
             <!-- Botones -->
             <div class="flex flex-col sm:flex-row justify-end gap-4">
-                <button type="button" id="cerrarModal" 
+                <button type="button" id="cerrarModal"
                     class="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 w-full sm:w-auto">
                     Cancelar
                 </button>
-                <button type="submit" 
+                <button type="submit"
                     class="bg-blue-600 hover:bg-blue-800 text-white py-2 px-4 rounded w-full sm:w-auto">
                     Guardar
                 </button>
@@ -196,28 +196,28 @@
             <!-- Nombre del Banco -->
             <div class="mb-4">
                 <label for="nombre_banco" class="block text-gray-700 font-bold mb-2">Nombre del Banco:</label>
-                <input type="text" id="nombre_banco" name="nombre_banco" required 
+                <input type="text" id="nombre_banco" name="nombre_banco" required
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
             </div>
 
             <!-- Número de Cuenta -->
             <div class="mb-4">
                 <label for="numero_cuenta" class="block text-gray-700 font-bold mb-2">Número de Cuenta:</label>
-                <input type="text" id="numero_cuenta" name="numero_cuenta" required 
+                <input type="text" id="numero_cuenta" name="numero_cuenta" required
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
             </div>
 
             <!-- CCI -->
             <div class="mb-4">
                 <label for="cci" class="block text-gray-700 font-bold mb-2">CCI:</label>
-                <input type="text" id="cci" name="cci" required 
+                <input type="text" id="cci" name="cci" required
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
             </div>
 
             <!-- Tipo de Cuenta -->
             <div class="mb-4">
                 <label for="tipo_cuenta" class="block text-gray-700 font-bold mb-2">Tipo de Cuenta:</label>
-                <select id="tipo_cuenta" name="tipo_cuenta" 
+                <select id="tipo_cuenta" name="tipo_cuenta"
                     class="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring focus:ring-blue-500">
                     <option value="ahorros">Cuenta de Ahorros</option>
                     <option value="corriente">Cuenta Corriente</option>
@@ -227,11 +227,11 @@
 
             <!-- Botones -->
             <div class="flex flex-col sm:flex-row justify-end gap-4">
-                <button type="button" id="cerrarModalCuentaBancaria" 
+                <button type="button" id="cerrarModalCuentaBancaria"
                     class="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 w-full sm:w-auto">
                     Cancelar
                 </button>
-                <button type="submit" 
+                <button type="submit"
                     class="bg-blue-600 hover:bg-blue-800 text-white py-2 px-4 rounded w-full sm:w-auto">
                     Guardar
                 </button>
@@ -272,7 +272,7 @@
     function openEditModal(id, ruc_dni, razon_social, nombre_comercial, telefono, numero_cuenta_bancaria, nombre_contacto) {
         // Mostrar el modal
         document.getElementById('modalEditarProveedor').classList.remove('hidden');
-    
+
         // Precargar los datos en el formulario del modal
         document.getElementById('edit_id').value = id;
         document.getElementById('edit_ruc_dni').value = ruc_dni;
@@ -285,7 +285,7 @@
     function openCuentaBancariaModal(id) {
         // Mostrar el modal
         document.getElementById('modalAgregarCuentaBancaria').classList.remove('hidden');
-    
+
         // Asignar el ID del proveedor al campo oculto del formulario
         document.getElementById('proveedor_id').value = id;
     }
@@ -295,7 +295,7 @@ function openVerCuentasModal(proveedorId) {
     const modal = document.getElementById('modalVerCuentasBancarias');
     const cuentasContainer = document.getElementById('cuentasContainer');
     const tituloCuentas = document.getElementById('tituloCuentasBancarias');
-    
+
     modal.classList.remove('hidden');
     cuentasContainer.innerHTML = '<p class="text-gray-600 text-center">Cargando cuentas bancarias...</p>';
 
@@ -340,23 +340,46 @@ document.getElementById('cerrarModalCuentas').addEventListener('click', () => {
     document.getElementById('cerrarModalCuentaBancaria').addEventListener('click', () => {
         document.getElementById('modalAgregarCuentaBancaria').classList.add('hidden');
     });
-    // Confirmar eliminación usando SweetAlert
-    function confirmDelete(id, nombre) {
-        Swal.fire({
-            title: '¿Estás seguro?',
-            text: `¿Deseas eliminar al proveedor: ${nombre}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Sí, eliminar',
-            cancelButtonText: 'Cancelar'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                window.location.href = `/proveedores/eliminar/${id}/`; // URL de eliminación
+function confirmDelete(id, nombre) {
+    // Verificar si el proveedor tiene gastos antes de preguntar si quiere eliminar
+    fetch(`/proveedores/verificar_gastos/${id}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.tiene_gastos) {
+                Swal.fire({
+                    title: 'No se puede eliminar',
+                    text: 'Este proveedor tiene gastos registrados y no se puede eliminar.',
+                    icon: 'error'
+                });
+            } else {
+                // Si no tiene gastos, preguntar si está seguro de eliminarlo
+                Swal.fire({
+                    title: '¿Estás seguro?',
+                    text: `¿Deseas eliminar al proveedor: ${nombre}?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = `/proveedores/eliminar/${id}/`;
+                    }
+                });
             }
+        })
+        .catch(error => {
+            console.error('Error al verificar gastos:', error);
+            Swal.fire({
+                title: 'Error',
+                text: 'Hubo un problema al verificar los gastos.',
+                icon: 'error'
+            });
         });
-    }
+}
+
+
         // Confirmar actualización
     function confirmUpdate() {
         event.preventDefault(); // Detener el envío del formulario
