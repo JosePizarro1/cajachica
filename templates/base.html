@@ -134,7 +134,11 @@ tailwind.config = {
       <i class="fas fa-users mr-2"></i>
       Ver Personal
     </a>
-
+    <a href="{% url 'ver_calendar' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+      <i class="fas fa-calendar-alt mr-2"></i>
+      Calendario
+  </a>
+  
     <!-- Ver Préstamos -->
     <a href="{% url 'ver_prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
       <i class="fas fa-list mr-2"></i>

@@ -48,23 +48,404 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from django.db import connection
+from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY
+from django.db import transaction
 
-def reiniciar_secuencia(request):
-    # Lista de tablas a limpiar. Usamos _meta.db_table para obtener el nombre real de la tabla.
-    tablas = [
-        Gasto._meta.db_table,
-        Ingreso._meta.db_table,
-        Rendicion._meta.db_table,
-    ]
+@login_required
+def eliminar_ocurrencia_evento(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            occ_id = data.get('id')
+            print("ID de ocurrencia a eliminar:", occ_id)
+            ocurrencia = OcurrenciaEvento.objects.get(id=occ_id)
+            ocurrencia.delete()
+            return JsonResponse({'success': True, 'message': 'La ocurrencia se ha eliminado correctamente.'})
+        except OcurrenciaEvento.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Ocurrencia no encontrada.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+@login_required
+def pagar_evento(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            occ_id = data.get('id')  # Recibe el ID del evento
+            evento = OcurrenciaEvento.objects.get(id=occ_id)
 
-    with connection.cursor() as cursor:
-        for tabla in tablas:
-            # Borrar todos los registros de la tabla
-            cursor.execute(f"DELETE FROM {tabla};")
-            # Reiniciar la secuencia en SQLite
-            cursor.execute(f"DELETE FROM sqlite_sequence WHERE name='{tabla}';")
+            evento.pagado = True  # Marcar como pagado
+            evento.save()
 
-    return HttpResponse("Tablas limpiadas y secuencias reiniciadas.")
+            return JsonResponse({'success': True, 'message': 'El evento ha sido marcado como pagado.'})
+        except Evento.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Evento no encontrado.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def gasto_calendario(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+
+            fecha = data.get('fecha')
+            importe = data.get('importe')
+            metodo_pago = data.get('metodo_pago')
+            moneda = data.get('moneda')
+            local_id = data.get('local')
+            tipo_comprobante = data.get('tipo_comprobante')
+            nombre_proveedor = data.get('nombre_proveedor')
+            observacion = data.get('observacion')
+            codigo_operacion = data.get('codigo_operacion') if metodo_pago != 'efectivo' or tipo_comprobante == 'Deposito en cuenta' else None
+            fecha_operacion = data.get('fecha_operacion') if metodo_pago != 'efectivo' or tipo_comprobante == 'Deposito en cuenta' else None
+            concepto_nivel_1 = data.get('concepto_nivel_1')
+            concepto_nivel_2 = data.get('concepto_nivel_2')
+            concepto_nivel_3 = data.get('concepto_nivel_3')
+            numero_comprobante = data.get('num_comprobante')
+            fecha_emision_comprobante = data.get('fecha_emision_comprobante') if tipo_comprobante in ['RHE', 'Factura', 'Boleta', 'Nota', 'Proforma'] else None
+            campo_area = data.get('campo_area')
+            campo_mes = data.get('campo_mes') if tipo_comprobante == 'Boleta de pago' else None
+            id_requerimiento = data.get('id_requerimiento') if tipo_comprobante == 'Requerimiento' else None
+            num_requerimiento = data.get('num_requerimiento') if tipo_comprobante == 'Requerimiento' else None
+            banco_id = data.get('banco_operacion') if tipo_comprobante == 'Deposito en cuenta' else None
+            occ_id = data.get('event_id')
+
+            # Validación de campos obligatorios
+            if not all([fecha, importe, metodo_pago, moneda]):
+                return JsonResponse({'error': 'Todos los campos obligatorios deben completarse.'}, status=400)
+
+            # Validación de tipo de comprobante
+            if tipo_comprobante in ['RHE', 'Factura', 'Boleta'] and (not numero_comprobante or not fecha_emision_comprobante):
+                return JsonResponse({'error': 'Número y Fecha de Emisión del Comprobante son obligatorios.'}, status=400)
+            if tipo_comprobante == 'Boleta de pago' and not campo_mes:
+                return JsonResponse({'error': 'El campo "Mes" es obligatorio para "Boleta de pago".'}, status=400)
+            if tipo_comprobante == 'Requerimiento' and not id_requerimiento:
+                return JsonResponse({'error': 'El ID Requerimiento es obligatorio para "Requerimiento".'}, status=400)
+
+            # Validar formato de fecha
+            try:
+                fecha = datetime.strptime(fecha, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({'error': 'Formato de fecha inválido (YYYY-MM-DD requerido).'}, status=400)
+
+            # Buscar proveedor
+            proveedor = Proveedor.objects.filter(id=nombre_proveedor).first()
+            if not proveedor:
+                return JsonResponse({'error': 'El proveedor especificado no existe.'}, status=404)
+
+            # Obtener el local
+            local = Local.objects.filter(id=local_id).first() if local_id else None
+            if local_id and not local:
+                return JsonResponse({'error': 'El local especificado no existe.'}, status=404)
+
+            # Validar conceptos
+            resultado_conceptos = comprobar_conceptos(tipo_comprobante, concepto_nivel_1, concepto_nivel_2, concepto_nivel_3)
+            if 'error' in resultado_conceptos:
+                return JsonResponse({'error': 'Revise los niveles de los conceptos, falta llenar algunos campos.'}, status=400)
+
+            concepto_1, concepto_2, concepto_3 = resultado_conceptos['concepto_nivel_1'], resultado_conceptos['concepto_nivel_2'], resultado_conceptos['concepto_nivel_3']
+
+            # Obtener banco si se proporciona
+            banco = Banco.objects.filter(id=banco_id).first() if banco_id else None
+            if banco_id and not banco:
+                return JsonResponse({'error': 'El banco especificado no existe.'}, status=404)
+
+            # Obtener evento
+            evento = OcurrenciaEvento.objects.filter(id=occ_id).first()
+            if not evento:
+                return JsonResponse({'error': 'El evento especificado no existe.'}, status=404)
+
+            # Transacción atómica: si algo falla, nada se guarda
+            with transaction.atomic():
+                # Crear gasto
+                gasto = Gasto.objects.create(
+                    fecha_gasto=fecha,
+                    concepto_nivel_1=concepto_1,
+                    concepto_nivel_2=concepto_2,
+                    concepto_nivel_3=concepto_3,
+                    importe=importe,
+                    nombre_proveedor=proveedor,
+                    local=local,
+                    tipo_comprobante=tipo_comprobante,
+                    tipo_pago=metodo_pago,
+                    codigo_operacion=codigo_operacion,
+                    observacion=observacion,
+                    fecha_operacion=fecha_operacion,
+                    moneda=moneda,
+                    numero_comprobante=numero_comprobante,
+                    fecha_emision_comprobante=fecha_emision_comprobante,
+                    campo_area=campo_area,
+                    campo_mes=campo_mes,
+                    id_requerimiento=id_requerimiento,
+                    num_requerimiento=num_requerimiento,
+                    banco=banco,
+                    usuario_creador=request.user
+                )
+
+                # Marcar el evento como pagado
+                evento.pagado = True
+                evento.save()
+
+            return JsonResponse({'success': 'Gasto registrado correctamente.'}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Error al procesar la solicitud. Datos JSON inválidos.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
+
+
+@login_required
+def eliminar_evento(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            event_id = data.get('id')
+
+            if not event_id:
+                return JsonResponse({'success': False, 'error': 'ID del evento no proporcionado.'}, status=400)
+
+            evento = Evento.objects.get(id=event_id, creado_por=request.user)
+
+            # Eliminar todas las ocurrencias relacionadas
+            OcurrenciaEvento.objects.filter(evento=evento).delete()
+
+            # Eliminar el evento maestro
+            evento.delete()
+
+            return JsonResponse({'success': True, 'message': 'El evento y sus ocurrencias han sido eliminados correctamente.'})
+
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Error en el formato de la solicitud.'}, status=400)
+        except Evento.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Evento no encontrado o no tienes permisos para eliminarlo.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+from django.db.models import Sum, Count, Case, When, DecimalField
+
+@login_required
+def resumen_eventos(request):
+
+    resumen = (
+        OcurrenciaEvento.objects
+        .annotate(month=TruncMonth('fecha'))
+        .values('month')
+        .annotate(
+            total=Sum('evento__monto', output_field=DecimalField()),
+            pendientes=Count(Case(When(pagado=False, then=1))),
+            pagos=Count(Case(When(pagado=True, then=1)))
+        )
+        .order_by('month')
+    )
+    data = []
+    for item in resumen:
+        month_date = item['month']
+        total = item['total'] or 0
+        pendientes = item['pendientes']
+        pagos = item['pagos']
+        # Aquí se usa strftime y luego se pasa a mayúsculas; si tu servidor tiene locale configurado en español se mostrará correctamente.
+        month_str = month_date.strftime("%B %Y").upper()
+        data.append({
+            'month': month_str,
+            'total': str(total),  # Puedes formatearlo como moneda si lo deseas
+            'pendientes': pendientes,
+            'pagos': pagos,
+        })
+    return JsonResponse(data, safe=False)
+@login_required
+def obtener_eventos_pagados(request):
+    # Filtramos solo ocurrencias pagadas
+    ocurrencias = OcurrenciaEvento.objects.filter(pagado=True)
+    events_list = []
+    
+    for occ in ocurrencias:
+        evento = occ.evento
+        start_date = occ.fecha.isoformat()  # Usamos la fecha específica de la ocurrencia
+        
+        event_dict = {
+            'id': f"pagado_{occ.id}",  # Prefijo para identificar
+            'title': f"{evento.titulo}",  # Checkmark para indicar pagado
+            'start': start_date,
+            'allDay': True,
+            'extendedProps': {
+                'monto': str(evento.monto) if evento.monto is not None else "",
+                'notas': evento.notas,
+                'recurrencia': evento.recurrencia,
+                'pagado': True,  # Siempre true en este endpoint
+                'evento_id': evento.id,
+                'prestamo': evento.prestamo,
+                'ocurrencia_id': occ.id  # ID específico de la ocurrencia
+            }
+        }
+
+        events_list.append(event_dict)
+    
+    return JsonResponse(events_list, safe=False)
+
+@login_required
+def obtener_eventos(request):    
+    # Se obtienen todas las ocurrencias
+    ocurrencias = OcurrenciaEvento.objects.filter(pagado=False)
+    events_list = []
+    
+    for occ in ocurrencias:
+        evento = occ.evento
+        start_date = evento.fecha_inicio.isoformat()
+        end_date = None  # Inicializar end_date
+
+        if evento.recurrencia.lower() == 'none':
+            if evento.fecha_fin and evento.fecha_fin != evento.fecha_inicio:
+                end_date = (evento.fecha_fin + timedelta(days=1)).isoformat()  # 🔹 Sumar 1 día a end_date
+            event_dict = {
+                'id': occ.id,
+                'title': evento.titulo,
+                'start': start_date,
+                'allDay': True,
+                'extendedProps': {
+                    'monto': str(evento.monto) if evento.monto is not None else "",
+                    'notas': evento.notas,
+                    'recurrencia': evento.recurrencia,
+                    'pagado': occ.pagado,
+                    'evento_id': evento.id,
+                    'prestamo': evento.prestamo  # 🔹 Agregar info de préstamo
+
+                }
+            }
+
+            if end_date:  # ✅ Asegurar que 'end' se agregue correctamente
+                event_dict['end'] = end_date
+
+        else:
+            # Para eventos recurrentes, cada ocurrencia se muestra individualmente
+            event_dict = {
+                'id': occ.id,
+                'title': evento.titulo,
+                'start': occ.fecha.isoformat(),
+                'allDay': True,
+                'extendedProps': {
+                    'monto': str(evento.monto) if evento.monto is not None else "",
+                    'notas': evento.notas,
+                    'recurrencia': evento.recurrencia,
+                    'pagado': occ.pagado,
+                    'evento_id': evento.id,
+                    'prestamo': evento.prestamo  # 🔹 Agregar info de préstamo
+
+                }
+            }
+        
+        events_list.append(event_dict)
+    
+    return JsonResponse(events_list, safe=False)
+@login_required
+def crear_evento(request):
+    if request.method == 'POST':
+        try:
+            print("Recibiendo solicitud para crear evento...")
+            data = json.loads(request.body)
+            print("Datos recibidos:", data)
+
+            titulo = data.get('titulo')
+            fecha_inicio = data.get('fecha_inicio')
+            fecha_fin = data.get('fecha_fin')  # Puede ser None o vacío
+            recurrencia = data.get('recurrencia', 'none').lower()
+            monto = data.get('monto')
+            notas = data.get('notas')
+            prestamo = data.get('prestamo', False)  # Valor booleano
+            repeat_until = data.get('repeatUntil')
+
+            # Validación básica
+            if not titulo or not fecha_inicio:
+                print("Error: Faltan campos obligatorios.")
+                return JsonResponse({'error': 'Faltan campos obligatorios'}, status=400)
+
+            # Para eventos recurrentes, si se envía repeatUntil, usarlo como fecha_fin
+            if recurrencia != 'none' and repeat_until:
+                print("Evento recurrente: usando 'repeatUntil' como fecha_fin:", repeat_until)
+                fecha_fin = repeat_until
+
+            print("Creando evento maestro...")
+            evento = Evento.objects.create(
+                titulo=titulo,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                recurrencia=recurrencia,
+                monto=monto if monto != "" else None,
+                notas=notas,
+                creado_por=request.user,
+                prestamo=prestamo
+            )
+            print("Evento maestro creado:", evento)
+
+            # Creación de ocurrencias:
+            if recurrencia == 'none':
+                # Evento sin recurrencia: se crea una única ocurrencia en fecha_inicio.
+                dtstart = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+                if fecha_fin and fecha_fin != fecha_inicio:
+                    dtend = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+                    print(f"Creando única ocurrencia para evento de varios días: {dtstart} - {dtend}")
+                    OcurrenciaEvento.objects.create(evento=evento, fecha=dtstart)
+                else:
+                    print(f"Creando única ocurrencia para evento de un día: {dtstart}")
+                    OcurrenciaEvento.objects.create(evento=evento, fecha=dtstart)
+            else:
+                # Evento recurrente: se generan múltiples ocurrencias.
+                if fecha_fin:
+                    dtstart = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+                    dtend = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+                    print("Evento recurrente. dtstart:", dtstart, "dtend:", dtend)
+                    freq = {'daily': DAILY, 'weekly': WEEKLY, 'monthly': MONTHLY}.get(recurrencia, None)
+                    if freq:
+                        print("Generando ocurrencias con frecuencia:", recurrencia)
+                        for occ in rrule(freq, dtstart=dtstart, until=dtend):
+                            occ_date = occ.date()
+                            OcurrenciaEvento.objects.create(evento=evento, fecha=occ_date)
+                            print("Creada ocurrencia:", occ_date)
+                else:
+                    dtstart = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+                    print("Evento recurrente sin límite. dtstart:", dtstart)
+                    OcurrenciaEvento.objects.create(evento=evento, fecha=dtstart)
+                    print("Creada única ocurrencia para evento recurrente sin límite:", dtstart)
+
+            print("Evento y ocurrencias creados correctamente.")
+            return JsonResponse({
+                'success': True,
+                'id': evento.id,
+                'titulo': evento.titulo
+            })
+        except Exception as e:
+            print("Error en crear_evento:", e)
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+def ver_calendar(request):
+    nivel_1_conceptos = Concepto.objects.filter(nivel=1)
+    nivel_2_conceptos = Concepto.objects.filter(nivel=2)
+    nivel_3_conceptos = Concepto.objects.filter(nivel=3)
+    fondos = Fondo.objects.all()
+    locales = Local.objects.all()
+    bancos = Banco.objects.all()
+    proveedores = Proveedor.objects.all()  # Obtener todos los proveedores
+    nivel_1_conceptos_json = json.dumps(list(nivel_1_conceptos.values_list('id', 'concepto_nombre')), default=str)
+
+    return render(request, 'calendario.html', {
+        'nivel_1_conceptos_json': nivel_1_conceptos_json,
+        'fondos': fondos,
+        'locales': locales,
+        'proveedores': proveedores,  # Pasar los proveedores al contexto
+        'nivel_1_conceptos': nivel_1_conceptos,
+        'nivel_2_conceptos': nivel_2_conceptos,
+        'nivel_3_conceptos': nivel_3_conceptos,
+        'bancos':bancos
+    })
+
+
+
 
 @csrf_exempt
 def registrar_usuario(request):
@@ -126,19 +507,14 @@ def reactivar_caja_usuario(request, user_id):
 def editar_personal(request, id):
     personal = get_object_or_404(Personal, id=id)
     bancos=Banco.objects.all()
-    # Convertir remuneración a string con dos decimales si no es None
     if personal.remuneracion is not None:
         personal.remuneracion = f"{float(personal.remuneracion):.2f}"
     return render(request, 'editar_personal.html', {'personal': personal ,'bancos':bancos})
 
 def crear_contraseña(request, personal_id):
     personal = get_object_or_404(Personal, id=personal_id)
-
-    # Datos a enviar al otro sistema
     nombre = personal.apellidos_nombres
     telefono = personal.celular
-
-    # URL del otro sistema que recibe los datos
     url_crear_cliente = "http://cafeteria.egatur.edu.pe/crear-cliente/"
 
     # Parámetros para la petición GET

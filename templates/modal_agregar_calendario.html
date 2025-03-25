@@ -1,0 +1,227 @@
+<!-- Modal para Agregar Evento -->
+<div id="eventModal" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center hidden">
+  <div class="bg-white rounded-lg shadow-lg p-6 w-96">
+    <div class="flex justify-between items-center mb-4">
+      <h5 class="text-lg font-semibold">Agregar Evento</h5>
+      <button class="text-gray-500 hover:text-gray-700" id="closeModal">✖</button>
+    </div>
+    <!-- Formulario en formato de grid para distribuir los campos -->
+    <form id="eventForm" class="grid grid-cols-2 gap-4">
+      <!-- Título (ocupa dos columnas) -->
+      <div class="col-span-2">
+        <input type="text" id="eventTitle" class="w-full p-2 border rounded" placeholder="Título" required>
+      </div>
+      <!-- Fecha de Inicio -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Inicio</label>
+        <input type="date" id="eventStart" class="w-full p-2 border rounded" required>
+      </div>
+      <!-- Fecha de Fin -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Fin</label>
+        <input type="date" id="eventEnd" class="w-full p-2 border rounded">
+      </div>
+      <!-- Repetición -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Repetición</label>
+        <select id="eventRepeat" class="w-full p-2 border rounded">
+          <option value="none">No se repite</option>
+          <option value="daily">Diario</option>
+          <option value="weekly">Semanal</option>
+          <option value="monthly">Mensual</option>
+        </select>
+      </div>
+      <!-- Campo adicional para "Diario": Repetir hasta -->
+      <div id="repeatUntilContainer" class="hidden">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Repetir hasta</label>
+        <input type="date" id="repeatUntil" class="w-full p-2 border rounded">
+      </div>
+      <!-- Monto -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Monto</label>
+        <input type="number" id="eventAmount" class="w-full p-2 border rounded" placeholder="Monto" min="0">
+      </div>
+      <!-- Observaciones (ocupa dos columnas) -->
+      <div class="col-span-2">
+        <textarea id="eventNotes" class="w-full p-2 border rounded" placeholder="Observaciones" rows="2"></textarea>
+      </div>
+      <!-- Nuevo: Toggle para indicar si es préstamo -->
+      <div class="col-span-2 flex items-center">
+        <span class="mr-2 text-sm font-medium text-gray-700">Préstamo:</span>
+        <label for="prestamoToggle" class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="prestamoToggle" class="sr-only peer">
+          <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-500 peer-checked:bg-blue-600 
+                      after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border 
+                      after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+          <span class="ml-3 text-sm font-medium text-gray-900">No / Sí</span>
+        </label>
+      </div>
+    </form>
+    <!-- Botones de acción -->
+    <div class="flex justify-end mt-4 gap-2">
+      <button id="closeModalBtn" class="bg-red-300 hover:bg-red-400 text-white py-1 px-3 rounded transition-colors duration-200">Cancelar</button>
+      <button id="saveEvent" class="bg-green-300 hover:bg-green-400 text-white py-1 px-3 rounded transition-colors duration-200">Guardar</button>
+    </div>
+  </div>
+</div>
+
+  
+  
+<script>
+$(document).ready(function() {
+    function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      var cookies = document.cookie.split(';');
+      for (var i = 0; i < cookies.length; i++) {
+        var cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  var csrftoken = getCookie('csrftoken');
+    // Configuración global de AJAX para enviar el token CSRF en las peticiones no seguras
+    $.ajaxSetup({
+    beforeSend: function(xhr, settings) {
+      if (!(/^GET|HEAD|OPTIONS|TRACE$/i.test(settings.type)) && !this.crossDomain) {
+        xhr.setRequestHeader("X-CSRFToken", csrftoken);
+      }
+    }
+  });
+
+
+  // Si se selecciona "Diario", mostrar el campo "Repetir hasta" y deshabilitar "Fin"
+  $('#eventRepeat').on('change', function() {
+    var repeatVal = $(this).val();
+    if (repeatVal !== 'none') {
+      $('#repeatUntilContainer').removeClass('hidden');
+      $('#eventEnd').prop('disabled', true).val('');
+    } else {
+      $('#repeatUntilContainer').addClass('hidden');
+      $('#eventEnd').prop('disabled', false);
+    }
+  });
+  
+  // Abrir modal Agregar Evento con transición suave
+  $('[data-modal-target]').on('click', function() {
+    $('#eventModal').removeClass('hidden').hide().fadeIn(600);
+  });
+
+  // Cerrar modal Agregar Evento con transición suave
+  $('#closeModal, #closeModalBtn').on('click', function() {
+    $('#eventModal').fadeOut(600, function() {
+      $(this).addClass('hidden').css('display', '');
+    });
+  });
+
+  let guardando = false;
+
+
+// Guardar evento desde el modal vía AJAX con SweetAlert2 y RRule
+$('#saveEvent').on('click', function() {
+  if(guardando) return;
+  var titulo       = $('#eventTitle').val();
+  var fecha_inicio = $('#eventStart').val();
+  // Si "Fin" está deshabilitado o vacío, usar la fecha de inicio
+  var fecha_fin    = ($('#eventEnd').prop('disabled') || !$('#eventEnd').val()) ? fecha_inicio : $('#eventEnd').val();
+  var recurrencia  = $('#eventRepeat').val();  // 'none', 'daily', 'weekly' o 'monthly'
+  var monto        = $('#eventAmount').val();
+  var notas        = $('#eventNotes').val();
+  var repeatUntil  = $('#repeatUntil').val();
+  var prestamo     = $('#prestamoToggle').is(':checked');
+
+  if (!titulo || !fecha_inicio) return;
+
+  // Preparar datos para enviar, usando los nombres de campo del modelo
+  var data = {
+    titulo: titulo,
+    fecha_inicio: fecha_inicio,
+    fecha_fin: fecha_fin,
+    recurrencia: recurrencia,
+    monto: monto,
+    notas: notas,
+    prestamo: prestamo,
+    repeatUntil: repeatUntil,
+  };
+
+  // Si se define una recurrencia, agregar la propiedad rrule
+  if (recurrencia !== 'none') {
+    // Definir la fecha límite para la recurrencia: se usa "repeatUntil" si existe, de lo contrario se usa fecha_fin
+    var untilDate = repeatUntil || fecha_fin;
+    if (recurrencia === 'daily') {
+      data.rrule = {
+        freq: 'daily',
+        dtstart: fecha_inicio,
+        until: untilDate
+      };
+    } else if (recurrencia === 'weekly') {
+      data.rrule = {
+        freq: 'weekly',
+        dtstart: fecha_inicio,
+        until: untilDate
+      };
+    } else if (recurrencia === 'monthly') {
+      data.rrule = {
+        freq: 'monthly',
+        dtstart: fecha_inicio,
+        until: untilDate,
+        bymonthday: -1   // Usa el último día del mes en meses que no tengan el día de fecha_inicio
+      };
+    }
+  }
+  // Deshabilitar botón y mostrar carga
+  guardando = true;
+  $('#saveEvent').prop('disabled', true).html('<span class="loader"></span> Guardando...');
+
+  $.ajax({
+    url: '/crear-evento/',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify(data),
+    success: function(response) {
+      if (response.success) {
+        Swal.fire({
+          title: '¡Éxito!',
+          text: 'El evento se ha guardado correctamente.',
+          icon: 'success',
+          confirmButtonText: 'Aceptar'
+        }).then(function(){
+          actualizarEventos();  // Actualiza todos los eventos
+          $('#eventForm')[0].reset();
+          $('#eventEnd').prop('disabled', false);
+          $('#repeatUntilContainer').addClass('hidden');
+          $('#eventModal').addClass('hidden');
+        });
+      } else {
+        Swal.fire({
+          title: 'Error!',
+          text: response.error,
+          icon: 'error',
+          confirmButtonText: 'Aceptar'
+        });
+      }
+    },
+    error: function(xhr, status, error) {
+      Swal.fire({
+        title: 'Error!',
+        text: 'Error al guardar el evento.',
+        icon: 'error',
+        confirmButtonText: 'Aceptar'
+      });
+    },
+    complete: function() {
+                // Reactivar botón y quitar spinner
+                guardando = false;
+                $('#saveEvent').prop('disabled', false).html('Guardar');
+            }
+  });
+});
+
+
+
+});
+</script>

@@ -1,6 +1,39 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.conf import settings
 
+class Evento(models.Model):
+    titulo = models.CharField(max_length=200)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField(null=True, blank=True)
+    recurrencia = models.CharField(
+        max_length=20,
+        choices=(
+            ('none', 'No se repite'),
+            ('daily', 'Diario'),
+            ('weekly', 'Semanal'),
+            ('monthly', 'Mensual'),
+        ),
+        default='none'
+    )
+    
+    monto = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    notas = models.TextField(blank=True)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    prestamo = models.BooleanField(default=False, verbose_name="Prestamo")  # Nuevo campo
+    evento_pagado = models.BooleanField(default=False, verbose_name="Evento Pagado")  # Nuevo campo
+
+    def __str__(self):
+        return self.titulo
+
+class OcurrenciaEvento(models.Model):
+    evento = models.ForeignKey(Evento, on_delete=models.CASCADE, related_name='ocurrencias')
+    fecha = models.DateField()
+    pagado = models.BooleanField(default=False)
+    # Puedes agregar otros campos, como observaciones específicas de la ocurrencia
+    def __str__(self):
+        return f"{self.evento.titulo} - {self.fecha}"
+    
 class SaldoInicial(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name="saldo_inicial")
     monto_saldo_inicial = models.DecimalField(max_digits=15, decimal_places=2, help_text="Saldo inicial del usuario")
