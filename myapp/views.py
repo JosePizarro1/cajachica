@@ -50,7 +50,27 @@ from reportlab.lib.styles import getSampleStyleSheet
 from django.db import connection
 from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY
 from django.db import transaction
+from django.views.decorators.http import require_POST
 
+@login_required
+@require_POST
+def actualizar_evento(request):
+    try:
+        data = json.loads(request.body)
+        event_id = data.get("id")
+        nueva_fecha = data.get("fecha")
+
+        evento = OcurrenciaEvento.objects.get(id=event_id)
+        evento.fecha = nueva_fecha
+        evento.save()
+
+        return JsonResponse({"success": "Fecha actualizada correctamente."})
+    except OcurrenciaEvento.DoesNotExist:
+        return JsonResponse({"error": "Evento no encontrado."}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": f"Ocurrió un error: {str(e)}"}, status=500)
+    
+    
 @login_required
 def eliminar_ocurrencia_evento(request):
     if request.method == 'POST':
@@ -446,6 +466,15 @@ def ver_calendar(request):
 
 
 
+
+
+
+
+
+
+
+
+# ------------------------------------------------------
 
 @csrf_exempt
 def registrar_usuario(request):

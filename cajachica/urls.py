@@ -13,7 +13,6 @@ urlpatterns = [
     path('dashboard/',dashboard_view, name='dashboard'),
     path('ingreso/', ingreso, name='ingreso'),
     path('gasto/', gasto, name='gasto'),
-    path('gasto_calendario/', gasto_calendario, name='gasto_calendario'),
 
 
     path('rendicion/', rendicion, name='rendicion'),
@@ -68,6 +67,11 @@ urlpatterns = [
     path('trigger-error/', trigger_error, name='trigger_error'),
     path('eliminar-item/<int:item_id>/<str:item_tipo>/', eliminar_item, name='eliminar_item'),
     path('reporte-concepto-proveedor-pdf/', reporte_concepto_proveedor_pdf, name='reporte_concepto_proveedor_pdf'),
+
+
+
+
+    #Calendario
     path('calendario/', ver_calendar, name='ver_calendar'),
     path('crear-evento/', crear_evento, name='crear_evento'),
     path('obtener-eventos/', obtener_eventos, name='obtener_eventos'),
@@ -75,6 +79,8 @@ urlpatterns = [
     path('eliminar-ocurrencia-evento/', eliminar_ocurrencia_evento, name='eliminar_ocurrencia_evento'),
     path('pagar-evento/', pagar_evento, name='pagar_evento'),
     path('obtener-eventos-pagados/', obtener_eventos_pagados, name='obtener_eventos_pagados'),
+    path('actualizar_evento/', actualizar_evento, name='actualizar_evento'),  
+    path('gasto_calendario/', gasto_calendario, name='gasto_calendario'),
 
 ]
 if settings.DEBUG:
