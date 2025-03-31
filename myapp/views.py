@@ -36,21 +36,895 @@ from datetime import date
 from decimal import Decimal
 from django.shortcuts import render
 import urllib.parse
-from datetime import date, timedelta
+from datetime import date, timedelta,datetime
 from django.shortcuts import render
 from django.http import HttpResponse
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from django.db.models import Sum
 import io
 from openpyxl.utils import get_column_letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,PageBreak
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet,ParagraphStyle
 from django.db import connection
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.units import inch
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import inch
+import re
+from reportlab.platypus import Image
+from django.db import transaction,IntegrityError
+from django.views.decorators.http import require_POST
+from dateutil.rrule import rrule, DAILY, WEEKLY, MONTHLY
+from django.http import FileResponse
+
+
+def generar_reporte_pdf_calendario(request):
+    fecha_inicio = request.GET.get('inicio')
+    fecha_fin = request.GET.get('fin')
+
+    # Obtener ocurrencias en el rango de fechas
+    ocurrencias = OcurrenciaEvento.objects.filter(
+        fecha__gte=fecha_inicio,
+        fecha__lte=fecha_fin
+    ).select_related('evento').order_by('fecha')
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer,
+                          pagesize=letter,
+                          rightMargin=30,
+                          leftMargin=30,
+                          topMargin=100,  # Aumentado para el nuevo header
+                          bottomMargin=30)
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Estilos personalizados
+    titulo_style = ParagraphStyle(
+        'Titulo',
+        parent=styles['Heading1'],
+        fontSize=16,
+        leading=18,
+        alignment=1,  # Centrado
+        spaceAfter=6,
+        fontName='Helvetica-Bold'
+    )
+
+    # Cabecera del documento mejorada
+    logo_path = str(settings.BASE_DIR) + '/static/images/egatur_logo.png'
+
+    header_data = [
+        # Fila 1: Logo a la derecha
+        [
+            '',
+            '',
+            Image(logo_path, width=0.8*inch, height=0.8*inch, hAlign='RIGHT') if settings.DEBUG else ''
+        ],
+        # Fila 2: Título centrado
+        [
+            Paragraph(
+                f"<b>REPORTE DE EVENTOS</b><br/>"
+                f"<font size=12>{fecha_inicio} al {fecha_fin}</font>",
+                titulo_style
+            )
+        ],
+        # Fila 3: Fecha generación
+        [
+            Paragraph(f"<font size=9 color='#666666'>Generado el: {timezone.now().strftime('%d/%m/%Y %H:%M')}</font>", ParagraphStyle('FechaGen', alignment=1, textColor=colors.HexColor('#666666')))
+        ]
+    ]
+
+    header_table = Table(header_data, colWidths=['*', '*', 2*inch])
+    header_table.setStyle(TableStyle([
+        ('ALIGN', (2,0), (2,0), 'RIGHT'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (2,0), (2,0), 10),
+        ('ALIGN', (0,1), (-1,1), 'CENTER'),
+        ('VALIGN', (0,1), (-1,1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,1), (-1,1), 12),
+        ('LINEBELOW', (0,1), (-1,1), 1, colors.HexColor('#e0e0e0')),
+        ('ALIGN', (0,2), (-1,2), 'CENTER'),
+        ('TEXTCOLOR', (0,2), (-1,2), colors.HexColor('#666666')),
+        ('BOTTOMPADDING', (0,2), (-1,2), 15),
+    ]))
+
+    elements.append(header_table)
+    elements.append(Spacer(1, 0.2*inch))
+
+    # Datos de la tabla
+    table_data = []
+    # Encabezados
+    table_data.append([
+        Paragraph('<b>Evento</b>', styles['BodyText']),
+        Paragraph('<b>Fecha</b>', styles['BodyText']),
+        Paragraph('<b>Estado</b>', styles['BodyText']),
+        Paragraph('<b>Monto (S/)</b>', styles['BodyText']),
+        Paragraph('<b>Saldo Pendiente</b>', styles['BodyText'])
+    ])
+
+    # Variables para totales
+    total_general = 0
+    total_pagado = 0
+    total_pendiente = 0
+
+    # Llenar datos
+    for o in ocurrencias:
+        monto = o.evento.monto or 0
+        estado = 'Pagado' if o.pagado else 'Pendiente'
+        saldo = 0 if o.pagado else monto
+
+        table_data.append([
+            Paragraph(o.evento.titulo, styles['BodyText']),
+            o.fecha.strftime('%d/%m/%Y'),
+            estado,
+            f"S/ {monto:.2f}" if o.pagado else "-",
+            f"S/ {saldo:.2f}" if not o.pagado else "-"
+        ])
+
+        total_general += monto
+        total_pagado += monto if o.pagado else 0
+        total_pendiente += saldo
+
+    # Fila de totales
+    table_data.append([
+        Paragraph('<b>TOTALES</b>', styles['BodyText']),
+        '',
+        '',
+        Paragraph(f"<b>S/ {total_pagado:.2f}</b>", styles['BodyText']),
+        Paragraph(f"<b>S/ {total_pendiente:.2f}</b>", styles['BodyText'])
+    ])
+
+    # Crear tabla
+    tabla = Table(table_data, colWidths=[2.5*inch, 1.2*inch, 1.2*inch, 1.5*inch, 1.5*inch])
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f5f5f5')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#333333')),
+        ('ALIGN', (2,0), (-1,-1), 'RIGHT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('BOTTOMPADDING', (0,0), (-1,0), 12),
+        ('BACKGROUND', (0,1), (-1,-2), colors.white),
+        ('GRID', (0,0), (-1,-2), 1, colors.HexColor('#e0e0e0')),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#f8f9fa')),
+        ('BOX', (0,-1), (-1,-1), 1, colors.HexColor('#e0e0e0')),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+    ]))
+
+    elements.append(tabla)
+
+    # Pie de página mejorado
+    def add_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica', 8)
+        canvas.setFillColor(colors.HexColor('#666666'))
+        canvas.drawRightString(doc.width + doc.leftMargin, 0.5*inch, f"Página {doc.page}")
+        canvas.restoreState()
+
+    doc.build(elements, onFirstPage=add_footer, onLaterPages=add_footer)
+
+    buffer.seek(0)
+    return FileResponse(buffer,
+                      as_attachment=True,
+                      filename=f'reporte_eventos_{fecha_inicio}_{fecha_fin}.pdf')
+
+
+def obtener_total_mes(request):
+    mes = request.GET.get('mes')
+    anio = request.GET.get('anio')
+
+    if not mes or not anio:
+        return JsonResponse({'error': 'Mes y año son requeridos'}, status=400)
+
+    try:
+        mes, anio = int(mes), int(anio)
+
+        # 🔹 Filtrar ocurrencias del mes y que NO estén pagadas
+        total = OcurrenciaEvento.objects.filter(
+            fecha__year=anio,
+            fecha__month=mes,
+            pagado=False  # Solo eventos NO pagados
+        ).aggregate(total=Sum('evento__monto'))['total'] or 0
+
+        return JsonResponse({'total': round(total, 2)})
+
+    except ValueError:
+        return JsonResponse({'error': 'Mes y año deben ser numéricos'}, status=400)
+
+
+@login_required
+@require_POST
+def actualizar_evento(request):
+    try:
+        data = json.loads(request.body)
+        event_id = data.get("id")
+        nueva_fecha = data.get("fecha")
+
+        evento = OcurrenciaEvento.objects.get(id=event_id)
+        evento.fecha = nueva_fecha
+        evento.save()
+
+        return JsonResponse({"success": "Fecha actualizada correctamente."})
+    except OcurrenciaEvento.DoesNotExist:
+        return JsonResponse({"error": "Evento no encontrado."}, status=404)
+    except Exception as e:
+        return JsonResponse({"error": f"Ocurrió un error: {str(e)}"}, status=500)
+
+
+@login_required
+def eliminar_ocurrencia_evento(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            occ_id = data.get('id')
+            print("ID de ocurrencia a eliminar:", occ_id)
+            ocurrencia = OcurrenciaEvento.objects.get(id=occ_id)
+            ocurrencia.delete()
+            return JsonResponse({'success': True, 'message': 'La ocurrencia se ha eliminado correctamente.'})
+        except OcurrenciaEvento.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Ocurrencia no encontrada.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+@login_required
+def pagar_evento(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            occ_id = data.get('id')  # Recibe el ID del evento
+            evento = OcurrenciaEvento.objects.get(id=occ_id)
+
+            evento.pagado = True  # Marcar como pagado
+            evento.save()
+
+            return JsonResponse({'success': True, 'message': 'El evento ha sido marcado como pagado.'})
+        except Evento.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Evento no encontrado.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+
+@login_required
+def gasto_calendario(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+
+            fecha = data.get('fecha')
+            importe = data.get('importe')
+            metodo_pago = data.get('metodo_pago')
+            moneda = data.get('moneda')
+            local_id = data.get('local')
+            tipo_comprobante = data.get('tipo_comprobante')
+            nombre_proveedor = data.get('nombre_proveedor')
+            observacion = data.get('observacion')
+            codigo_operacion = data.get('codigo_operacion') if metodo_pago != 'efectivo' else None
+            fecha_operacion = data.get('fecha_operacion') if metodo_pago != 'efectivo' else None
+            concepto_nivel_1 = data.get('concepto_nivel_1')
+            concepto_nivel_2 = data.get('concepto_nivel_2')
+            concepto_nivel_3 = data.get('concepto_nivel_3')
+            numero_comprobante = data.get('num_comprobante')
+            fecha_emision_comprobante = data.get('fecha_emision_comprobante') if tipo_comprobante in ['RHE', 'Factura', 'Boleta', 'Nota', 'Proforma'] else None
+            campo_area = data.get('campo_area')
+            campo_mes = data.get('campo_mes') if tipo_comprobante == 'Boleta de pago' else None
+            id_requerimiento = data.get('id_requerimiento') if tipo_comprobante == 'Requerimiento' else None
+            num_requerimiento = data.get('num_requerimiento') if tipo_comprobante == 'Requerimiento' else None
+            banco_id = data.get('banco_operacion') if metodo_pago != 'efectivo' else None
+            occ_id = data.get('event_id')
+
+            # Validación de campos obligatorios
+            if not all([fecha, importe, metodo_pago, moneda]):
+                return JsonResponse({'error': 'Todos los campos obligatorios deben completarse.'}, status=400)
+
+            # Validación de tipo de comprobante
+            if tipo_comprobante in ['RHE', 'Factura', 'Boleta'] and (not numero_comprobante or not fecha_emision_comprobante):
+                return JsonResponse({'error': 'Número y Fecha de Emisión del Comprobante son obligatorios.'}, status=400)
+            if tipo_comprobante == 'Boleta de pago' and not campo_mes:
+                return JsonResponse({'error': 'El campo "Mes" es obligatorio para "Boleta de pago".'}, status=400)
+            if tipo_comprobante == 'Requerimiento' and not id_requerimiento:
+                return JsonResponse({'error': 'El ID Requerimiento es obligatorio para "Requerimiento".'}, status=400)
+
+            # Validar formato de fecha
+            try:
+                fecha = datetime.strptime(fecha, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({'error': 'Formato de fecha inválido (YYYY-MM-DD requerido).'}, status=400)
+
+            # Buscar proveedor
+            proveedor = Proveedor.objects.filter(id=nombre_proveedor).first()
+            if not proveedor:
+                return JsonResponse({'error': 'El proveedor especificado no existe.'}, status=404)
+
+            # Obtener el local
+            local = Local.objects.filter(id=local_id).first() if local_id else None
+            if local_id and not local:
+                return JsonResponse({'error': 'El local especificado no existe.'}, status=404)
+
+            # Validar conceptos
+            resultado_conceptos = comprobar_conceptos(tipo_comprobante, concepto_nivel_1, concepto_nivel_2, concepto_nivel_3)
+            if 'error' in resultado_conceptos:
+                return JsonResponse({'error': 'Revise los niveles de los conceptos, falta llenar algunos campos.'}, status=400)
+
+            concepto_1, concepto_2, concepto_3 = resultado_conceptos['concepto_nivel_1'], resultado_conceptos['concepto_nivel_2'], resultado_conceptos['concepto_nivel_3']
+
+            # Obtener banco si se proporciona
+            banco = Banco.objects.filter(id=banco_id).first() if banco_id else None
+            if banco_id and not banco:
+                return JsonResponse({'error': 'El banco especificado no existe.'}, status=404)
+
+            # Obtener evento
+            evento = OcurrenciaEvento.objects.filter(id=occ_id).first()
+            if not evento:
+                return JsonResponse({'error': 'El evento especificado no existe.'}, status=404)
+
+            # Transacción atómica: si algo falla, nada se guarda
+            with transaction.atomic():
+                # Crear gasto
+                gasto = Gasto.objects.create(
+                    fecha_gasto=fecha,
+                    concepto_nivel_1=concepto_1,
+                    concepto_nivel_2=concepto_2,
+                    concepto_nivel_3=concepto_3,
+                    importe=importe,
+                    nombre_proveedor=proveedor,
+                    local=local,
+                    tipo_comprobante=tipo_comprobante,
+                    tipo_pago=metodo_pago,
+                    codigo_operacion=codigo_operacion,
+                    observacion=observacion,
+                    fecha_operacion=fecha_operacion,
+                    moneda=moneda,
+                    numero_comprobante=numero_comprobante,
+                    fecha_emision_comprobante=fecha_emision_comprobante,
+                    campo_area=campo_area,
+                    campo_mes=campo_mes,
+                    id_requerimiento=id_requerimiento,
+                    num_requerimiento=num_requerimiento,
+                    banco=banco,
+                    usuario_creador=request.user
+                )
+
+                # Marcar el evento como pagado
+                evento.pagado = True
+                evento.save()
+
+            return JsonResponse({'success': 'Gasto registrado correctamente.'}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Error al procesar la solicitud. Datos JSON inválidos.'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': f'Error inesperado: {str(e)}'}, status=500)
+
+
+@login_required
+def eliminar_evento(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            event_id = data.get('id')
+
+            if not event_id:
+                return JsonResponse({'success': False, 'error': 'ID del evento no proporcionado.'}, status=400)
+
+            evento = Evento.objects.get(id=event_id, creado_por=request.user)
+
+            # Eliminar todas las ocurrencias relacionadas
+            OcurrenciaEvento.objects.filter(evento=evento).delete()
+
+            # Eliminar el evento maestro
+            evento.delete()
+
+            return JsonResponse({'success': True, 'message': 'El evento y sus ocurrencias han sido eliminados correctamente.'})
+
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Error en el formato de la solicitud.'}, status=400)
+        except Evento.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Evento no encontrado o no tienes permisos para eliminarlo.'}, status=404)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'Error interno: {str(e)}'}, status=500)
+
+    return JsonResponse({'success': False, 'error': 'Método no permitido.'}, status=405)
+from django.db.models import Sum, Count, Case, When, DecimalField
+
+@login_required
+def resumen_eventos(request):
+
+    resumen = (
+        OcurrenciaEvento.objects
+        .annotate(month=TruncMonth('fecha'))
+        .values('month')
+        .annotate(
+            total=Sum('evento__monto', output_field=DecimalField()),
+            pendientes=Count(Case(When(pagado=False, then=1))),
+            pagos=Count(Case(When(pagado=True, then=1)))
+        )
+        .order_by('month')
+    )
+    data = []
+    for item in resumen:
+        month_date = item['month']
+        total = item['total'] or 0
+        pendientes = item['pendientes']
+        pagos = item['pagos']
+        # Aquí se usa strftime y luego se pasa a mayúsculas; si tu servidor tiene locale configurado en español se mostrará correctamente.
+        month_str = month_date.strftime("%B %Y").upper()
+        data.append({
+            'month': month_str,
+            'total': str(total),  # Puedes formatearlo como moneda si lo deseas
+            'pendientes': pendientes,
+            'pagos': pagos,
+        })
+    return JsonResponse(data, safe=False)
+@login_required
+def obtener_eventos_pagados(request):
+    # Filtramos solo ocurrencias pagadas
+    ocurrencias = OcurrenciaEvento.objects.filter(pagado=True)
+    events_list = []
+
+    for occ in ocurrencias:
+        evento = occ.evento
+        start_date = occ.fecha.isoformat()  # Usamos la fecha específica de la ocurrencia
+
+        event_dict = {
+            'id': f"pagado_{occ.id}",  # Prefijo para identificar
+            'title': f"{evento.titulo}",  # Checkmark para indicar pagado
+            'start': start_date,
+            'allDay': True,
+            'extendedProps': {
+                'monto': str(evento.monto) if evento.monto is not None else "",
+                'notas': evento.notas,
+                'recurrencia': evento.recurrencia,
+                'pagado': True,  # Siempre true en este endpoint
+                'evento_id': evento.id,
+                'prestamo': evento.prestamo,
+                'ocurrencia_id': occ.id  # ID específico de la ocurrencia
+            }
+        }
+
+        events_list.append(event_dict)
+
+    return JsonResponse(events_list, safe=False)
+
+@login_required
+def obtener_eventos(request):
+    # Se obtienen todas las ocurrencias
+    ocurrencias = OcurrenciaEvento.objects.filter(pagado=False)
+    events_list = []
+
+    for occ in ocurrencias:
+        evento = occ.evento
+        start_date = evento.fecha_inicio.isoformat()
+        end_date = None  # Inicializar end_date
+
+        if evento.recurrencia.lower() == 'none':
+            if evento.fecha_fin and evento.fecha_fin != evento.fecha_inicio:
+                end_date = (evento.fecha_fin + timedelta(days=1)).isoformat()  # 🔹 Sumar 1 día a end_date
+            event_dict = {
+                'id': occ.id,
+                'title': evento.titulo,
+                'start': start_date,
+                'allDay': True,
+                'extendedProps': {
+                    'monto': str(evento.monto) if evento.monto is not None else "",
+                    'notas': evento.notas,
+                    'recurrencia': evento.recurrencia,
+                    'pagado': occ.pagado,
+                    'evento_id': evento.id,
+                    'prestamo': evento.prestamo  # 🔹 Agregar info de préstamo
+
+                }
+            }
+
+            if end_date:  # ✅ Asegurar que 'end' se agregue correctamente
+                event_dict['end'] = end_date
+
+        else:
+            # Para eventos recurrentes, cada ocurrencia se muestra individualmente
+            event_dict = {
+                'id': occ.id,
+                'title': evento.titulo,
+                'start': occ.fecha.isoformat(),
+                'allDay': True,
+                'extendedProps': {
+                    'monto': str(evento.monto) if evento.monto is not None else "",
+                    'notas': evento.notas,
+                    'recurrencia': evento.recurrencia,
+                    'pagado': occ.pagado,
+                    'evento_id': evento.id,
+                    'prestamo': evento.prestamo  # 🔹 Agregar info de préstamo
+
+                }
+            }
+
+        events_list.append(event_dict)
+
+    return JsonResponse(events_list, safe=False)
+
+
+@login_required
+def crear_evento(request):
+    if request.method == 'POST':
+        try:
+            print("Recibiendo solicitud para crear evento...")
+            data = json.loads(request.body)
+            print("Datos recibidos:", data)
+
+            titulo = data.get('titulo')
+            fecha_inicio = data.get('fecha_inicio')
+            fecha_fin = data.get('fecha_fin')  # Puede ser None o vacío
+            recurrencia = data.get('recurrencia', 'none').lower()
+            monto = data.get('monto')
+            notas = data.get('notas')
+            prestamo = data.get('prestamo', False)  # Valor booleano
+            repeat_until = data.get('repeatUntil')
+
+            # Validación básica
+            if not titulo or not fecha_inicio:
+                print("Error: Faltan campos obligatorios.")
+                return JsonResponse({'error': 'Faltan campos obligatorios'}, status=400)
+
+            # Para eventos recurrentes, si se envía repeatUntil, usarlo como fecha_fin
+            if recurrencia != 'none' and repeat_until:
+                print("Evento recurrente: usando 'repeatUntil' como fecha_fin:", repeat_until)
+                fecha_fin = repeat_until
+
+            print("Creando evento maestro...")
+            evento = Evento.objects.create(
+                titulo=titulo,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                recurrencia=recurrencia,
+                monto=monto if monto != "" else None,
+                notas=notas,
+                creado_por=request.user,
+                prestamo=prestamo
+            )
+            print("Evento maestro creado:", evento)
+
+            # Creación de ocurrencias:
+            if recurrencia == 'none':
+                # Evento sin recurrencia: se crea una única ocurrencia en fecha_inicio.
+                dtstart = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+                if fecha_fin and fecha_fin != fecha_inicio:
+                    dtend = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+                    print(f"Creando única ocurrencia para evento de varios días: {dtstart} - {dtend}")
+                    OcurrenciaEvento.objects.create(evento=evento, fecha=dtstart)
+                else:
+                    print(f"Creando única ocurrencia para evento de un día: {dtstart}")
+                    OcurrenciaEvento.objects.create(evento=evento, fecha=dtstart)
+            else:
+                # Evento recurrente: se generan múltiples ocurrencias.
+                if fecha_fin:
+                    dtstart = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+                    dtend = datetime.strptime(fecha_fin, '%Y-%m-%d').date()
+                    print("Evento recurrente. dtstart:", dtstart, "dtend:", dtend)
+                    freq = {'daily': DAILY, 'weekly': WEEKLY, 'monthly': MONTHLY}.get(recurrencia, None)
+                    if freq:
+                        print("Generando ocurrencias con frecuencia:", recurrencia)
+                        for occ in rrule(freq, dtstart=dtstart, until=dtend):
+                            occ_date = occ.date()
+                            OcurrenciaEvento.objects.create(evento=evento, fecha=occ_date)
+                            print("Creada ocurrencia:", occ_date)
+                else:
+                    dtstart = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+                    print("Evento recurrente sin límite. dtstart:", dtstart)
+                    OcurrenciaEvento.objects.create(evento=evento, fecha=dtstart)
+                    print("Creada única ocurrencia para evento recurrente sin límite:", dtstart)
+
+            print("Evento y ocurrencias creados correctamente.")
+            return JsonResponse({
+                'success': True,
+                'id': evento.id,
+                'titulo': evento.titulo
+            })
+        except Exception as e:
+            print("Error en crear_evento:", e)
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
+
+def ver_calendar(request):
+    nivel_1_conceptos = Concepto.objects.filter(nivel=1)
+    nivel_2_conceptos = Concepto.objects.filter(nivel=2)
+    nivel_3_conceptos = Concepto.objects.filter(nivel=3)
+    fondos = Fondo.objects.all()
+    locales = Local.objects.all()
+    bancos = Banco.objects.all()
+    proveedores = Proveedor.objects.all()  # Obtener todos los proveedores
+    nivel_1_conceptos_json = json.dumps(list(nivel_1_conceptos.values_list('id', 'concepto_nombre')), default=str)
+
+    return render(request, 'calendario.html', {
+        'nivel_1_conceptos_json': nivel_1_conceptos_json,
+        'fondos': fondos,
+        'locales': locales,
+        'proveedores': proveedores,  # Pasar los proveedores al contexto
+        'nivel_1_conceptos': nivel_1_conceptos,
+        'nivel_2_conceptos': nivel_2_conceptos,
+        'nivel_3_conceptos': nivel_3_conceptos,
+        'bancos':bancos
+    })
+
+
+# ------------------------------------------------------
+
+
+
+def generar_pdf_rendiciones(request):
+    fecha_desde = request.GET.get("desde", "")
+    fecha_hasta = request.GET.get("hasta", "")
+
+    # Convertir a formato datetime para filtrar correctamente
+    fecha_inicio = datetime.strptime(fecha_desde, "%Y-%m-%d")
+    fecha_fin = datetime.strptime(fecha_hasta, "%Y-%m-%d")
+
+    # Filtrar los gastos por fecha_rendido dentro del rango dado (INCLUYENDO el 25 y 27)
+    gastos = Gasto.objects.filter(fecha_rendido__gte=fecha_inicio, fecha_rendido__lte=fecha_fin)
+
+    # Nombre del archivo PDF
+    nombre_archivo = f"Rendiciones_{fecha_desde}_a_{fecha_hasta}.pdf"
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+
+    # Crear el documento PDF
+    doc = SimpleDocTemplate(response, pagesize=A4, leftMargin=inch, rightMargin=inch, topMargin=inch, bottomMargin=inch)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Estilos personalizados
+    estilo_titulo = ParagraphStyle("Titulo", parent=styles["Title"], fontSize=18, textColor=colors.HexColor("#255a9e"), alignment=1)
+    estilo_texto = ParagraphStyle("Normal", parent=styles["BodyText"], fontSize=10)
+    estilo_header = ParagraphStyle("Header", parent=styles["BodyText"], fontSize=12, textColor=colors.white)
+
+    # 🏷️ **Portada del PDF**
+    elements.append(Spacer(1, 80))  # Aumentar el espacio antes del título
+    elements.append(Paragraph("<b>RENDICIONES</b>", estilo_titulo))
+    elements.append(Spacer(1, 30))  # Aumentar el espacio entre el título y la fecha
+    elements.append(Paragraph(f"Desde: <b>{fecha_desde}</b> Hasta: <b>{fecha_hasta}</b>", estilo_titulo))
+    elements.append(Spacer(1, 100))  # Aumentar espacio antes de la imagen
+
+    # 📌 **Imagen centrada más abajo**
+    logo_path = f"{settings.STATICFILES_DIRS[0]}/images/egatur_logo.png"  # Ajusta la ruta si es necesario
+    img = Image(logo_path, width=380, height=380)  # Ajusta el tamaño si es necesario
+    img.hAlign = 'CENTER'  # Centra la imagen
+    elements.append(img)
+
+    elements.append(PageBreak())  # Salto de página
+
+
+
+    # 📜 **Procesar cada gasto**
+    for gasto in gastos:
+        rendiciones = gasto.rendiciones_gasto.all()
+        total_importe = sum(r.importe for r in rendiciones if r.importe)
+
+        # 🔹 **Encabezado del gasto**
+        elements.append(Paragraph(f"<b>Rendición de Gasto #{gasto.id}</b>", estilo_titulo))
+        elements.append(Spacer(1, 12))
+
+        # 🔹 **Datos del gasto**
+        datos_gasto = [
+            [Paragraph("<b>ID Requerimiento:</b>", estilo_texto), Paragraph(gasto.id_requerimiento or "-", estilo_texto),
+             Paragraph("<b>N° Requerimiento:</b>", estilo_texto), Paragraph(gasto.num_requerimiento or "-", estilo_texto)],
+            [Paragraph("<b>Área:</b>", estilo_texto), Paragraph(gasto.campo_area or "-", estilo_texto),
+             Paragraph("<b>Fecha de Gasto:</b>", estilo_texto), Paragraph(gasto.fecha_gasto.strftime('%d/%m/%Y') if gasto.fecha_gasto else "-", estilo_texto)],
+            [Paragraph("<b>Proveedor:</b>", estilo_texto), Paragraph(gasto.nombre_proveedor.razon_social if gasto.nombre_proveedor else "-", estilo_texto),
+             Paragraph("<b>Local:</b>", estilo_texto), Paragraph(gasto.local.nombre_local if gasto.local else "-", estilo_texto)],
+            [Paragraph("<b>Importe Total:</b>", estilo_texto), Paragraph(f"S/. {gasto.importe:,.2f} {gasto.moneda}", estilo_texto),
+             Paragraph("<b>Observación:</b>", estilo_texto), Paragraph(gasto.observacion or "-", estilo_texto)]
+        ]
+
+        tabla_gasto = Table(datos_gasto, colWidths=[100, 180, 100, 180])
+        tabla_gasto.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("GRID", (0, 0), (-1, -1), 0, colors.white),  # Bordes invisibles
+            ("WORDWRAP", (0, 0), (-1, -1), "CJK"),  # Evita desbordes de texto
+        ]))
+
+        elements.append(tabla_gasto)
+        elements.append(Spacer(1, 12))
+
+        # 🔹 **Detalle de Rendiciones**
+        if rendiciones:
+            elements.append(Paragraph("<b>Detalle de Rendiciones</b>", styles["Heading2"]))
+            elements.append(Spacer(1, 10))
+
+            datos_rendiciones = [
+                [Paragraph("<b>Fecha</b>", estilo_header),
+                 Paragraph("<b>Descripción</b>", estilo_header),
+                 Paragraph("<b>N° Requerimiento</b>", estilo_header),
+                 Paragraph("<b>Tipo Comprobante</b>", estilo_header),
+                 Paragraph("<b>Proveedor</b>", estilo_header),
+                 Paragraph("<b>Importe</b>", estilo_header)]
+            ]
+
+            for rendicion in rendiciones:
+                datos_rendiciones.append([
+                    Paragraph(rendicion.fecha_operacion.strftime('%d/%m/%Y') if rendicion.fecha_operacion else "-", estilo_texto),
+                    Paragraph(rendicion.descripcion or "-", estilo_texto),
+                    Paragraph(rendicion.numero_requerimiento or "-", estilo_texto),
+                    Paragraph(rendicion.tipo_comprobante or "-", estilo_texto),
+                    Paragraph(rendicion.proveedor.razon_social if rendicion.proveedor else "-", estilo_texto),
+                    Paragraph(f"S/. {rendicion.importe:,.2f}", estilo_texto)
+                ])
+
+            # Agregar fila de total
+            datos_rendiciones.append(["", "", "", "", Paragraph("<b>Total:</b>", estilo_texto), Paragraph(f"S/. {total_importe:,.2f}", estilo_texto)])
+
+            tabla_rendiciones = Table(datos_rendiciones, colWidths=[70, 150, 80, 100, 100, 80])
+            tabla_rendiciones.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#255a9e")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]))
+
+            elements.append(tabla_rendiciones)
+            elements.append(Spacer(1, 12))
+
+        # 🔹 **Diferencia entre gasto y rendiciones**
+        diferencia = gasto.importe - total_importe
+        if diferencia < 0:
+            mensaje = Paragraph(f"<b>Se hizo un gasto extra de: S/. {abs(diferencia):,.2f}</b>", estilo_texto)
+        elif diferencia > 0:
+            mensaje = Paragraph(f"<b>Se hizo un ingreso de: S/. {diferencia:,.2f}</b>", estilo_texto)
+        else:
+            mensaje = Paragraph("<b></b>", estilo_texto)
+
+        elements.append(mensaje)
+        elements.append(PageBreak())
+
+    # 📄 **Construcción final del PDF**
+    doc.build(elements)
+
+    return response
+
+def limpiar_nombre_archivo(texto):
+    return re.sub(r'[\\/*?:"<>|]', '', texto)
+
+def crear_pdf_rendicion(request, gasto_id):
+    gasto = get_object_or_404(Gasto, id=gasto_id)
+    rendiciones = gasto.rendiciones_gasto.all()
+
+    nombre_archivo = f"Requerimiento_{gasto.id_requerimiento}_N_{gasto.num_requerimiento}.pdf"
+    nombre_archivo = limpiar_nombre_archivo(nombre_archivo)
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+
+    doc = SimpleDocTemplate(response, pagesize=A4, leftMargin=inch, rightMargin=inch, topMargin=inch, bottomMargin=inch)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # Estilos personalizados
+    estilo_titulo = ParagraphStyle("Titulo", parent=styles["Title"], fontSize=16, textColor=colors.HexColor("#255a9e"))
+    estilo_texto = ParagraphStyle("Normal", parent=styles["BodyText"], fontSize=9)  # Tamaño reducido para evitar desbordes
+    estilo_header = ParagraphStyle("Header", parent=styles["BodyText"], fontSize=12, textColor=colors.white)
+    estilo_alerta_rojo = ParagraphStyle("AlertaRojo", parent=styles["BodyText"], fontSize=11, textColor=colors.HexColor("#D32F2F"))  # Rojo pastel
+    estilo_alerta_verde = ParagraphStyle("AlertaVerde", parent=styles["BodyText"], fontSize=11, textColor=colors.HexColor("#388E3C"))  # Verde suave
+
+    # Título del documento
+    elements.append(Paragraph(f"<b>Rendición de Gasto #{gasto.id}</b>", estilo_titulo))
+    elements.append(Spacer(1, 12))
+
+    # Datos del gasto en dos columnas
+    datos_gasto = [
+        [Paragraph("<b>ID Requerimiento:</b>", estilo_texto), Paragraph(gasto.id_requerimiento or "-", estilo_texto),
+         Paragraph("<b>N° Requerimiento:</b>", estilo_texto), Paragraph(gasto.num_requerimiento or "-", estilo_texto)],
+        [Paragraph("<b>Área:</b>", estilo_texto), Paragraph(gasto.campo_area or "-", estilo_texto),
+         Paragraph("<b>Fecha de Gasto:</b>", estilo_texto), Paragraph(gasto.fecha_gasto.strftime('%d/%m/%Y') if gasto.fecha_gasto else "-", estilo_texto)],
+        [Paragraph("<b>Proveedor:</b>", estilo_texto), Paragraph(gasto.nombre_proveedor.razon_social if gasto.nombre_proveedor else "-", estilo_texto),
+         Paragraph("<b>Local:</b>", estilo_texto), Paragraph(gasto.local.nombre_local if gasto.local else "-", estilo_texto)],
+        [Paragraph("<b>Importe Total:</b>", estilo_texto), Paragraph(f"S/. {gasto.importe:,.2f} {gasto.moneda}", estilo_texto),
+         Paragraph("<b>Observación:</b>", estilo_texto), Paragraph(gasto.observacion or "-", estilo_texto)]
+    ]
+
+    tabla_gasto = Table(datos_gasto, colWidths=[100, 180, 100, 180])
+    tabla_gasto.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("GRID", (0, 0), (-1, -1), 0, colors.white),  # Bordes invisibles
+        ("WORDWRAP", (0, 0), (-1, -1), "CJK"),  # Evita desbordes de texto
+    ]))
+
+    elements.append(tabla_gasto)
+    elements.append(Spacer(1, 12))
+
+    # Detalle de rendiciones
+    if rendiciones:
+        elements.append(Paragraph("<b>Detalle de Rendiciones</b>", styles["Heading2"]))
+        elements.append(Spacer(1, 10))
+
+        datos_rendiciones = [
+            [Paragraph("<b>Fecha</b>", estilo_header),
+             Paragraph("<b>Descripción</b>", estilo_header),
+             Paragraph("<b>N° Requerimiento</b>", estilo_header),
+             Paragraph("<b>Tipo Comprobante</b>", estilo_header),
+             Paragraph("<b>Proveedor</b>", estilo_header),
+             Paragraph("<b>Importe</b>", estilo_header)]
+        ]
+
+        total_importe = 0
+        for rendicion in rendiciones:
+            importe = rendicion.importe if rendicion.importe else 0
+            total_importe += importe
+            datos_rendiciones.append([
+                Paragraph(rendicion.fecha_operacion.strftime('%d/%m/%Y') if rendicion.fecha_operacion else "-", estilo_texto),
+                Paragraph(rendicion.descripcion or "-", estilo_texto),
+                Paragraph(rendicion.numero_requerimiento or "-", estilo_texto),
+                Paragraph(rendicion.tipo_comprobante or "-", estilo_texto),
+                Paragraph(rendicion.proveedor.razon_social if rendicion.proveedor else "-", estilo_texto),
+                Paragraph(f"S/. {importe:,.2f}", estilo_texto)
+            ])
+
+        # Agregar fila de total
+        datos_rendiciones.append(["", "", "", "", Paragraph("<b>Total:</b>", estilo_texto), Paragraph(f"S/. {total_importe:,.2f}", estilo_texto)])
+
+        # Crear la tabla
+        tabla_rendiciones = Table(datos_rendiciones, colWidths=[70, 150, 80, 100, 100, 80])
+        tabla_rendiciones.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#255a9e")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ("BACKGROUND", (-1, -1), (-1, -1), colors.lightgrey),  # Resaltar Total
+            ("WORDWRAP", (0, 0), (-1, -1), "CJK"),  # Evita desbordes de texto
+        ]))
+
+        elements.append(tabla_rendiciones)
+    # Calcular diferencia
+    diferencia = gasto.importe - total_importe
+
+    # Mostrar mensaje en rojo o verde dependiendo del valor de la diferencia
+    if diferencia < 0:
+        mensaje = Paragraph(f"<b>Se hizo un gasto extra de: S/. {abs(diferencia):,.2f}</b>", estilo_alerta_rojo)
+        elements.append(mensaje)
+    elif diferencia > 0:
+        mensaje = Paragraph(f"<b>Se hizo un ingreso de: S/. {diferencia:,.2f}</b>", estilo_alerta_verde)
+        elements.append(mensaje)
+    # Construir el PDF
+    doc.build(elements)
+
+    return response
+
+@login_required
+def ver_rendidos(request):
+    # Filtra solo los gastos que han sido rendidos (rendido=True)
+    gastos_rendiciones = Gasto.objects.filter(rendido=True)
+    return render(request, 'ver_rendidos.html', {'rendiciones': gastos_rendiciones})
+
+@login_required
+def ver_rendiciones_asociadas(request, gasto_id):
+    # Obtener el gasto o devolver 404 si no existe
+    gasto = get_object_or_404(Gasto, id=gasto_id)
+
+    # Obtener todas las rendiciones asociadas a este gasto
+    rendiciones = gasto.rendiciones_gasto.all()
+
+    # Convertir los datos a JSON
+    data = []
+    for rendicion in rendiciones:
+        data.append({
+            'id': rendicion.id,
+            'fecha_operacion': rendicion.fecha_operacion.strftime('%d/%m/%Y') if rendicion.fecha_operacion else None,
+            'descripcion': rendicion.descripcion or '',
+            'numero_requerimiento': rendicion.numero_requerimiento or '',
+            'importe': float(rendicion.importe) if rendicion.importe else 0,
+            'tipo_comprobante': rendicion.tipo_comprobante or '',
+            'proveedor': rendicion.proveedor.razon_social if rendicion.proveedor else '',
+        })
+
+    # Retornar los datos en formato JSON
+    return JsonResponse({'rendiciones': data}, safe=False)
+
 
 def reiniciar_secuencia(request):
-    # Lista de tablas a limpiar. Usamos _meta.db_table para obtener el nombre real de la tabla.
     tablas = [
         Gasto._meta.db_table,
         Ingreso._meta.db_table,
@@ -126,10 +1000,12 @@ def reactivar_caja_usuario(request, user_id):
 def editar_personal(request, id):
     personal = get_object_or_404(Personal, id=id)
     bancos=Banco.objects.all()
+    locales = Local.objects.all()
+
     # Convertir remuneración a string con dos decimales si no es None
     if personal.remuneracion is not None:
         personal.remuneracion = f"{float(personal.remuneracion):.2f}"
-    return render(request, 'editar_personal.html', {'personal': personal ,'bancos':bancos})
+    return render(request, 'editar_personal.html', {'personal': personal ,'bancos':bancos , 'locales':locales})
 
 def crear_contraseña(request, personal_id):
     personal = get_object_or_404(Personal, id=personal_id)
@@ -366,7 +1242,9 @@ def guardar_datos_editados(request, id_personal):
                 # Obtener los datos del formulario
                 banco_id = request.POST.get('nombre_cuenta')
                 banco = Banco.objects.get(id=banco_id) if banco_id else None
-
+                # Obtener la sede seleccionada
+                sede_id = request.POST.get('sede')
+                sede = Local.objects.get(id=sede_id) if sede_id else None
                 nuevo_cci = get_value('cci')
 
                 # Buscar la cuenta bancaria anterior con el CCI registrado en la ficha
@@ -419,6 +1297,7 @@ def guardar_datos_editados(request, id_personal):
                 ficha.turno_tarde_inicio = get_time("turno_tarde_inicio")
                 ficha.turno_tarde_fin = get_time("turno_tarde_fin")
                 ficha.observacion = get_value("observaciones")
+                ficha.local = sede
 
                 ficha.save()
 
@@ -771,85 +1650,156 @@ def convertir_a_float(valor):
     except ValueError:
         return 0.00  # Si hay error, devolver 0.00
 
-@login_required  # Asegurar que el usuario esté autenticado
+
+def convertir_a_float(valor):
+    try:
+        if isinstance(valor, str):
+            return float(valor.replace(',', '.'))
+        return float(valor)
+    except (ValueError, TypeError):
+        return 0.00
+
+@login_required
 def generar_reporte_diario(request):
-    if not hasattr(request, "user") or not request.user.is_authenticated:
-        return HttpResponse("Error: Usuario no autenticado", status=403)
+    try:
+        if not request.user.is_authenticated:
+            messages.error(request, "Usuario no autenticado")
+            return HttpResponse("Error: Usuario no autenticado", status=403)
 
-    hoy = date.today()
+        hoy = date.today()
 
-    # Obtener el saldo inicial desde la URL y convertirlo
-    saldo_inicial_str = request.GET.get('saldo_inicial', '0.00')
-    saldo_inicial = convertir_a_float(saldo_inicial_str)
+        # Configuración de estilos
+        HEADER_FILL = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
+        SECTION_FILL = PatternFill(start_color="D6E1F3", end_color="D6E1F3", fill_type="solid")
+        TOTAL_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+        CLOSING_FILL = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
+        BOLD_FONT = Font(bold=True, color="000000")
+        HEADER_FONT = Font(bold=True, color="FFFFFF")
+        MONEY_FORMAT = '#,##0.00'
+        CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
+        RIGHT_ALIGN = Alignment(horizontal="right", vertical="center")
+        BORDER = Border(left=Side(style='thin'), right=Side(style='thin'),
+                        top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # Filtrar ingresos y gastos del usuario actual y de hoy
-    ingresos = Ingreso.objects.filter(usuario_creador=request.user, fecha_ingreso=hoy)
-    gastos = Gasto.objects.filter(usuario_creador=request.user, fecha_gasto=hoy)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Reporte Diario"
 
-    # Calcular totales asegurando que los valores sean floats
-    total_ingresos = sum(convertir_a_float(i.importe) for i in ingresos)
-    total_gastos = sum(convertir_a_float(g.importe) for g in gastos)
+        # Encabezado principal
+        ws.merge_cells('A1:D1')
+        header_cell = ws['A1']
+        header_cell.value = "REPORTE DIARIO"
+        header_cell.fill = HEADER_FILL
+        header_cell.font = HEADER_FONT
+        header_cell.alignment = CENTER_ALIGN
 
-    # Crear el archivo Excel
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Reporte Diario"
+        # Fecha del reporte
+        ws.merge_cells('A2:D2')
+        ws['A2'] = f"Fecha: {hoy.strftime('%d de %B de %Y')}"
+        ws['A2'].alignment = CENTER_ALIGN
 
-    # Estilos
-    bold_font = Font(bold=True)
-    center_alignment = Alignment(horizontal="center", vertical="center")
+        # I. SALDO DE APERTURA
+        saldo_inicial = convertir_a_float(request.GET.get('saldo_inicial', '0.00'))
+        ws.append([])
+        row_num = ws.max_row + 1
+        ws.merge_cells(f'A{row_num}:C{row_num}')
+        ws[f'A{row_num}'] = "I. SALDO DE APERTURA DE CAJA"
+        ws[f'A{row_num}'].fill = SECTION_FILL
+        ws[f'A{row_num}'].font = BOLD_FONT
+        ws[f'D{row_num}'] = saldo_inicial
+        ws[f'D{row_num}'].number_format = MONEY_FORMAT
 
-    # Encabezado
-    ws.append(["REPORTE DIARIO"])
-    ws.append([f"Fecha: {hoy.strftime('%d de %B de %Y')}"])
+        # II. RECEPCIÓN DE EFECTIVO
+        ingresos = Ingreso.objects.filter(usuario_creador=request.user, fecha_ingreso=hoy)
+        total_ingresos = sum(convertir_a_float(i.importe) for i in ingresos)
 
-    ws.append([])
-    ws.append(["I. SALDO DE APERTURA DE CAJA"])
-    ws.append([f"{saldo_inicial:.2f}"])  # Se coloca el saldo inicial con dos decimales
+        ws.append([])
+        row_num = ws.max_row + 1
+        ws.merge_cells(f'A{row_num}:D{row_num}')
+        ws[f'A{row_num}'] = "II. RECEPCIÓN DE EFECTIVO"
+        ws[f'A{row_num}'].fill = SECTION_FILL
+        ws[f'A{row_num}'].font = BOLD_FONT
 
-    # Sección II: Recepción de Efectivo
-    ws.append([])
-    ws.append(["II. RECEPCIÓN DE EFECTIVO"])
-    ws.append(["ID", "Fecha", "Comentario", "Monto"])
+        # Encabezados de tabla
+        headers = ["ID", "Fecha", "Comentario", "Monto (S/.)"]
+        ws.append(headers)
+        for col in range(1, 5):
+            cell = ws.cell(row=ws.max_row, column=col)
+            cell.fill = HEADER_FILL
+            cell.font = HEADER_FONT
+            cell.alignment = CENTER_ALIGN
 
-    # Aplicar negrita a los encabezados de la tabla
-    for col in range(1, 5):
-        cell = ws.cell(row=ws.max_row, column=col)
-        cell.font = bold_font
-        cell.alignment = center_alignment
+        # Datos de ingresos
+        for ingreso in ingresos:
+            ws.append([
+                ingreso.id,
+                ingreso.fecha_ingreso.strftime('%d/%m/%Y') if ingreso.fecha_ingreso else '',
+                ingreso.observacion or "",
+                convertir_a_float(ingreso.importe)
+            ])
+            ws.cell(row=ws.max_row, column=4).number_format = MONEY_FORMAT
 
-    # Agregar los ingresos a la tabla con el formato correcto
-    for ingreso in ingresos:
-        monto_formateado = f"{convertir_a_float(ingreso.importe):.2f}"  # Formatear monto correctamente
-        ws.append([ingreso.id, ingreso.fecha_ingreso, ingreso.observacion or "", monto_formateado])
+        # Total ingresos
+        ws.append(["TOTAL INGRESOS", "", "", total_ingresos])
+        for col in range(1, 5):
+            cell = ws.cell(row=ws.max_row, column=col)
+            cell.fill = TOTAL_FILL
+            cell.font = BOLD_FONT
 
-    # Agregar una fila vacía y luego el total de ingresos
-    ws.append([])
-    ws.append(["TOTAL INGRESOS", "", "", f"{total_ingresos:.2f}"])
+        # III. GASTOS
+        gastos = Gasto.objects.filter(usuario_creador=request.user, fecha_gasto=hoy)
+        total_gastos = sum(convertir_a_float(g.importe) for g in gastos)
 
-    # Aplicar negrita al total de ingresos
-    for cell in ws[ws.max_row]:
-        cell.font = bold_font
-        cell.alignment = center_alignment
+        ws.append([])
+        row_num = ws.max_row + 1
+        ws.merge_cells(f'A{row_num}:C{row_num}')
+        ws[f'A{row_num}'] = "III. GASTOS"
+        ws[f'A{row_num}'].fill = SECTION_FILL
+        ws[f'A{row_num}'].font = BOLD_FONT
+        ws[f'D{row_num}'] = total_gastos
+        ws[f'D{row_num}'].number_format = MONEY_FORMAT
 
-    # Sección III: Gastos
-    ws.append([])
-    ws.append(["III. GASTOS"])
-    ws.append(["Total Gastos", f"{total_gastos:.2f}"])
+        # IV. SALDO AL CIERRE
+        saldo_cierre = saldo_inicial + total_ingresos - total_gastos
+        ws.append([])
+        row_num = ws.max_row + 1
+        ws.merge_cells(f'A{row_num}:C{row_num}')
+        ws[f'A{row_num}'] = "IV. SALDO AL CIERRE DEL DÍA"
+        ws[f'A{row_num}'].fill = CLOSING_FILL
+        ws[f'A{row_num}'].font = BOLD_FONT
+        ws[f'D{row_num}'] = saldo_cierre
+        ws[f'D{row_num}'].number_format = MONEY_FORMAT
 
-    # Aplicar negrita a los subtítulos de la sección de gastos
-    for cell in ws["A"]:
-        cell.font = bold_font
+        # Ajustar formato de celdas
+        def is_main_merged(cell):
+            for range in ws.merged_cells.ranges:
+                if cell.coordinate in range:
+                    return cell.coordinate == range.start_cell
+            return True
 
-    # Crear respuesta HTTP con el archivo Excel
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response["Content-Disposition"] = f'attachment; filename="Reporte_Diario_{hoy}.xlsx"'
-    wb.save(response)
+        for row in ws.iter_rows():
+            for cell in row:
+                if is_main_merged(cell):
+                    cell.border = BORDER
+                    if cell.column == 4:
+                        cell.alignment = RIGHT_ALIGN
 
-    return response
+        # Ajustar anchos de columnas
+        column_widths = {'A': 10, 'B': 15, 'C': 40, 'D': 15}
+        for col, width in column_widths.items():
+            ws.column_dimensions[col].width = width
 
+        # Generar respuesta
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="Reporte_Diario_{hoy.strftime("%Y%m%d")}.xlsx"'
+        wb.save(response)
+        return response
+
+    except Exception as e:
+        messages.error(request, f"Error generando reporte: {str(e)}")
+        return HttpResponse(f"Error generando reporte: {str(e)}", status=500)
 def reporte_mensual(request):
     if request.method == "POST":
         mes_inicio_str = request.POST.get("mes_inicio")
@@ -877,7 +1827,7 @@ def reporte_mensual(request):
         bold_blue_fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
         italic_bold_font = Font(bold=True, italic=True)
         gray_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
-        yellow_fill = PatternFill(start_color="FFFF99", end_color="FFFF99", fill_type="solid")
+        yellow_fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
 
         # Nombres de los meses (lista de 12 elementos)
         nombres_meses = [
@@ -1005,7 +1955,6 @@ def reporte_mensual(request):
         return response
 
 
-
 def reporte_anual(request):
     wb = Workbook()
     ws = wb.active
@@ -1106,19 +2055,131 @@ def reporte_anual(request):
 
 
 
-from django.db import transaction
 @login_required
 def ver_personal(request):
     today = date.today()  # Fecha actual
     hace_7_dias = today + timedelta(days=7)  # Hace una semana
 
     personal = Personal.objects.all()  # Obtener los registros de Personal
+    locales = Local.objects.all()
 
     return render(request, 'ver_personal.html', {
         'personal': personal,
         'today': today,
+        'locales':locales,
         'hace_7_dias': hace_7_dias  # Pasamos la fecha al template
     })
+
+def reporte_diario_conceptos(request):
+    # Obtener fechas del formulario
+    fecha_inicio = request.POST.get('fecha_inicio')
+    fecha_fin = request.POST.get('fecha_fin')
+
+    if not fecha_inicio or not fecha_fin:
+        return HttpResponse("Error: Debes proporcionar una fecha de inicio y una fecha de fin.", status=400)
+
+    # Convertir fechas a formato datetime
+    fecha_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d")
+    fecha_fin = datetime.strptime(fecha_fin, "%Y-%m-%d")
+
+    # Crear el workbook y la hoja
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reporte Diario Conceptos"
+
+    # Estilos
+    bold_font = Font(bold=True)
+    bold_gray_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+    bold_blue_fill = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+
+    # Generar lista de fechas en el rango
+    rango_fechas = []
+    current_date = fecha_inicio
+    while current_date <= fecha_fin:
+        rango_fechas.append(current_date.strftime("%Y-%m-%d"))
+        current_date += timedelta(days=1)
+
+    # Encabezado con los días en el rango
+    ws.append(['Concepto'] + rango_fechas + ['Total General'])
+    for cell in ws[1]:
+        cell.font = bold_font
+
+    total_general_dias = [0] * len(rango_fechas)  # Totales por día
+    total_general = 0  # Total global
+
+    # Obtener los conceptos de nivel 1
+    conceptos_nivel_1 = Concepto.objects.filter(nivel=1)
+
+    for concepto1 in conceptos_nivel_1:
+        valores_diarios = []
+        total_concepto1 = 0
+
+        # Iterar por cada día en el rango
+        for index, fecha in enumerate(rango_fechas):
+            fecha_dt = datetime.strptime(fecha, "%Y-%m-%d")
+            total_dia = (
+                Gasto.objects.filter(fecha_gasto=fecha_dt, concepto_nivel_1=concepto1)
+                .aggregate(total=Sum('importe'))['total'] or 0
+            ) + (
+                Rendicion.objects.filter(fecha_operacion=fecha_dt, concepto_nivel_1=concepto1)
+                .aggregate(total=Sum('importe'))['total'] or 0
+            )
+
+            # Si el concepto es "GASTOS DIVERSOS", sumar requerimientos no rendidos
+            if concepto1.concepto_nombre == "GASTOS DIVERSOS":
+                total_dia += (
+                    Gasto.objects.filter(
+                        fecha_gasto=fecha_dt,
+                        tipo_comprobante="Requerimiento",
+                        rendido=False
+                    ).aggregate(total=Sum('importe'))['total'] or 0
+                )
+
+            valores_diarios.append(total_dia)
+            total_concepto1 += total_dia
+            total_general_dias[index] += total_dia
+
+        total_general += total_concepto1
+        ws.append([concepto1.concepto_nombre] + valores_diarios + [total_concepto1])
+        for cell in ws[ws.max_row]:
+            cell.font = bold_font
+        ws[ws.max_row][0].fill = bold_gray_fill
+
+        # Conceptos de nivel 2
+        conceptos_nivel_2 = Concepto.objects.filter(id_concepto_padre=concepto1)
+        for concepto2 in conceptos_nivel_2:
+            valores_diarios = []
+            total_concepto2 = 0
+
+            for index, fecha in enumerate(rango_fechas):
+                fecha_dt = datetime.strptime(fecha, "%Y-%m-%d")
+                total_dia = (
+                    Gasto.objects.filter(fecha_gasto=fecha_dt, concepto_nivel_2=concepto2)
+                    .aggregate(total=Sum('importe'))['total'] or 0
+                ) + (
+                    Rendicion.objects.filter(fecha_operacion=fecha_dt, concepto_nivel_2=concepto2)
+                    .aggregate(total=Sum('importe'))['total'] or 0
+                )
+
+                valores_diarios.append(total_dia)
+                total_concepto2 += total_dia
+
+            # Omitir conceptos de nivel 2 con solo ceros
+            if total_concepto2 > 0:
+                ws.append(["   " + concepto2.concepto_nombre] + valores_diarios + [total_concepto2])
+                ws[ws.max_row][0].font = bold_font
+
+    # Agregar la fila final con los totales por día y total general
+    ws.append(["Total General"] + total_general_dias + [total_general])
+    for cell in ws[ws.max_row]:
+        cell.font = bold_font
+        cell.fill = bold_blue_fill
+
+    # Generar respuesta HTTP para la descarga del archivo
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename="Reporte_Diario_{fecha_inicio.strftime("%Y-%m-%d")}_al_{fecha_fin.strftime("%Y-%m-%d")}.xlsx"'
+    wb.save(response)
+    return response
 
 def guardar_datos1(request):
     if request.method == 'POST':
@@ -1128,28 +2189,46 @@ def guardar_datos1(request):
             return value if value else ""
 
         def get_date(field):
-            """Convierte la fecha a formato correcto o devuelve None si está vacía."""
+            """Convierte la fecha a formato correcto o devuelve un JsonResponse si hay error."""
             date_value = request.POST.get(field, "").strip()
+            if not date_value:
+                return None
             try:
-                return datetime.strptime(date_value, "%Y-%m-%d").date() if date_value else None
-            except ValueError:
-                return None  # Evita errores si la fecha no es válida
+                return datetime.strptime(date_value, "%Y-%m-%d").date()
+            except ValueError as e:
+                return JsonResponse({'error': f'Fecha inválida en {field}: {str(e)}'}, status=400)
+
         def get_time(field):
-            """Convierte la hora a formato correcto o devuelve None si está vacía."""
+            """Convierte la hora a formato correcto o devuelve un JsonResponse si hay error."""
             time_value = request.POST.get(field, "").strip()
+            if not time_value:
+                return None
             try:
-                return datetime.strptime(time_value, "%H:%M").time() if time_value else None
-            except ValueError:
-                return None  # Evita errores si la hora no es válida
+                return datetime.strptime(time_value, "%H:%M").time()
+            except ValueError as e:
+                return JsonResponse({'error': f'Hora inválida en {field}: {str(e)}'}, status=400)
+
         # Verificar si ya existe un proveedor con el mismo DNI
-        if Proveedor.objects.filter(ruc_dni=request.POST['dni']).exists():
-            return JsonResponse({'error': 'Ya existe un proveedor con ese DNI. Elimine el proveedor antes de continuar.'}, status=400)
+        if Proveedor.objects.filter(ruc_dni=request.POST.get('dni')).exists():
+            return JsonResponse({
+                'error': 'Ya existe un proveedor con ese DNI. Elimine el proveedor antes de continuar.'
+            }, status=400)
 
         try:
             with transaction.atomic():  # Garantiza que todo se guarde o nada se guarde
                 # Obtener el banco seleccionado
                 banco_id = request.POST.get('nombre_cuenta')
-                banco = Banco.objects.get(id=banco_id) if banco_id else None
+                try:
+                    banco = Banco.objects.get(id=banco_id) if banco_id else None
+                except Banco.DoesNotExist as e:
+                    return JsonResponse({'error': f'Banco no encontrado: {str(e)}'}, status=404)
+
+                # Obtener la sede (Local)
+                local_id = request.POST.get('sede')
+                try:
+                    local = Local.objects.get(id=local_id) if local_id else None
+                except Local.DoesNotExist as e:
+                    return JsonResponse({'error': f'Local no encontrado: {str(e)}'}, status=404)
 
                 # Guardar los datos del Personal
                 personal = Personal(
@@ -1165,7 +2244,7 @@ def guardar_datos1(request):
                     tipo_trabajador=get_value('tipo_trabajador'),
                     tipo_contrato=get_value('tipo_contrato'),
                     tipo_pago=get_value('tipo_pago'),
-                    nombre_cuenta=banco.nombre,
+                    nombre_cuenta=banco.nombre if banco else "",
                     numero_cuenta=get_value('numero_cuenta'),
                     asignacion_familiar=request.POST.get('asignacion_familiar') == 'on',
                     ocupacion=get_value('ocupacion'),
@@ -1183,7 +2262,24 @@ def guardar_datos1(request):
                     turno_manana_fin=get_time('turno_manana_fin'),
                     turno_tarde_inicio=get_time('turno_tarde_inicio'),
                     turno_tarde_fin=get_time('turno_tarde_fin'),
+                    local=local
                 )
+
+                if isinstance(personal.fecha_nacimiento, JsonResponse):
+                    return personal.fecha_nacimiento
+                if isinstance(personal.periodo_inicio, JsonResponse):
+                    return personal.periodo_inicio
+                if isinstance(personal.periodo_fin, JsonResponse):
+                    return personal.periodo_fin
+                if isinstance(personal.turno_manana_inicio, JsonResponse):
+                    return personal.turno_manana_inicio
+                if isinstance(personal.turno_manana_fin, JsonResponse):
+                    return personal.turno_manana_fin
+                if isinstance(personal.turno_tarde_inicio, JsonResponse):
+                    return personal.turno_tarde_inicio
+                if isinstance(personal.turno_tarde_fin, JsonResponse):
+                    return personal.turno_tarde_fin
+
                 personal.save()
 
                 # Crear un Proveedor con los datos del Personal
@@ -1204,10 +2300,16 @@ def guardar_datos1(request):
                 )
                 cuenta_bancaria.save()
 
-            return JsonResponse({'success': 'Datos guardados correctamente y proveedor creado.'}, status=200)
+            return JsonResponse({
+                'success': 'Datos guardados correctamente y proveedor creado.'
+            }, status=200)
 
+        except IntegrityError as ie:
+            return JsonResponse({'error': f'Error de integridad: {str(ie)}'}, status=500)
         except Exception as e:
             return JsonResponse({'error': f'Error al guardar los datos: {str(e)}'}, status=500)
+    else:
+        return HttpResponse(status=405)
 
 
 
@@ -1502,30 +2604,34 @@ def actualizar_movimiento(request):
         return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 
+
 def descargar_excel(request):
-    hoy = date.today().strftime('%Y-%m-%d')  # Formato para los campos de tipo date
+    # Configuración inicial y obtención de fechas
+    hoy = date.today().strftime('%Y-%m-%d')
     fecha_inicio = request.GET.get('fecha_inicio', hoy)
     fecha_fin = request.GET.get('fecha_fin', hoy)
     fecha_inicio = date.fromisoformat(fecha_inicio)
     fecha_fin = date.fromisoformat(fecha_fin)
+
+    # Obtención del saldo inicial
     saldo_base = Decimal(0)
     try:
         saldo_inicial = SaldoInicial.objects.get(usuario=request.user)
         saldo_base = saldo_inicial.monto_saldo_inicial
     except SaldoInicial.DoesNotExist:
-        saldo_base = Decimal('0.00')  # Si no tiene saldo inicial, asignar 0
+        saldo_base = Decimal('0.00')
+
     saldo_inicial = obtener_saldo_inicial_manual(fecha_inicio, usuario=request.user if not request.user.is_staff else None)
-    # Sumar el saldo base al saldo inicial
     saldo_inicial += saldo_base
+
+    # Obtención de datos
     if request.user.is_staff:
-        # Staff puede ver todos los ingresos y gastos
         ingresos = Ingreso.objects.filter(
             fecha_ingreso__range=[fecha_inicio, fecha_fin],
-            usuario_creador=request.user  # Filtra solo los ingresos creados por el usuario staff
+            usuario_creador=request.user
         )
         gastos = Gasto.objects.filter(fecha_gasto__range=[fecha_inicio, fecha_fin])
     else:
-        # No staff solo puede ver los ingresos y gastos que creó
         ingresos = Ingreso.objects.filter(
             fecha_ingreso__range=[fecha_inicio, fecha_fin],
             usuario_creador=request.user
@@ -1534,27 +2640,30 @@ def descargar_excel(request):
             fecha_gasto__range=[fecha_inicio, fecha_fin],
             usuario_creador=request.user
         )
-    movimientos = []
+
+    # Procesamiento de ingresos
+    ingresos_list = []
     for ingreso in ingresos:
         nombre_fondo = ingreso.id_fondo.nombre_fondo if ingreso.id_fondo else 'Sin nombre'
         tipo = 'Extorno' if ingreso.extorno else 'Ingreso'
-        banco_nombre = ingreso.banco.nombre if ingreso.banco else ''
-        codigo_operacion = ingreso.codigo_operacion or ''
-        fecha_operacion = ingreso.fecha_operacion.strftime('%d/%m/%Y') if ingreso.fecha_operacion else ''
-
-        movimientos.append({
-            'tipo': tipo if tipo else '',
+        ingresos_list.append({
+            'tipo': tipo,
             'fecha': ingreso.fecha_ingreso.strftime('%-d/%-m/%Y') if ingreso.fecha_ingreso else '',
-            'metodo_pago': ingreso.metodo_pago if ingreso.metodo_pago else '',
-            'concepto': nombre_fondo if nombre_fondo else '',
-            'proveedor': ingreso.id_fondo.nombre_fondo if ingreso.id_fondo and ingreso.id_fondo.nombre_fondo else '',
-            'banco': banco_nombre if banco_nombre else '',
-            'codigo_operacion': codigo_operacion if codigo_operacion else '',
-            'fecha_operacion': fecha_operacion if fecha_operacion else '',
-            'notas': ingreso.observacion if ingreso.observacion else '',
-            'monto': Decimal(ingreso.importe) if ingreso.importe else Decimal('0.00')
+            'metodo_pago': ingreso.metodo_pago or '',
+            'concepto': nombre_fondo,
+            'proveedor': ingreso.id_fondo.nombre_fondo if ingreso.id_fondo else '',
+            'banco': ingreso.banco.nombre if ingreso.banco else '',
+            'codigo_operacion': ingreso.codigo_operacion or '',
+            'fecha_operacion': ingreso.fecha_operacion.strftime('%d/%m/%Y') if ingreso.fecha_operacion else '',
+            'notas': ingreso.observacion or '',
+            'monto': Decimal(ingreso.importe) if ingreso.importe else Decimal('0.00'),
+            'local': ingreso.local.nombre_local if ingreso.local else '-',
+            'Comprobante': '-',
+            'NumeroComprobante': '-',
         })
 
+    # Procesamiento de gastos
+    gastos_list = []
     for gasto in gastos:
         if gasto.concepto_nivel_3:
             concepto = gasto.concepto_nivel_3.concepto_nombre
@@ -1563,68 +2672,143 @@ def descargar_excel(request):
         elif gasto.concepto_nivel_1:
             concepto = gasto.concepto_nivel_1.concepto_nombre
         else:
-            if gasto.id_requerimiento and gasto.num_requerimiento:
-                concepto = f"REQ N°{gasto.num_requerimiento} (Id={gasto.id_requerimiento})"
-            else:
-                concepto = gasto.tipo_comprobante or ''
-        banco_nombre = gasto.banco.nombre if gasto.banco else ''
-        codigo_operacion = gasto.codigo_operacion or ''
-        fecha_operacion = gasto.fecha_operacion.strftime('%d/%m/%Y') if gasto.fecha_operacion else ''
-        movimientos.append({
+            concepto = f"REQ N°{gasto.num_requerimiento} (Id={gasto.id_requerimiento})" if gasto.id_requerimiento else gasto.tipo_comprobante or ''
+
+        gastos_list.append({
             'tipo': 'Gasto',
             'fecha': gasto.fecha_gasto.strftime('%-d/%-m/%Y'),
             'metodo_pago': gasto.tipo_pago,
             'concepto': concepto,
             'proveedor': gasto.nombre_proveedor.razon_social,
-            'banco': banco_nombre,
-            'codigo_operacion': codigo_operacion,
-            'fecha_operacion': fecha_operacion,
+            'banco': gasto.banco.nombre if gasto.banco else '',
+            'codigo_operacion': gasto.codigo_operacion or '',
+            'fecha_operacion': gasto.fecha_operacion.strftime('%d/%m/%Y') if gasto.fecha_operacion else '',
             'notas': gasto.observacion or '',
-            'monto': Decimal(gasto.importe)
+            'monto': Decimal(gasto.importe),
+            'local': gasto.local.nombre_local if gasto.local else '-',
+            'Comprobante': gasto.tipo_comprobante or '-',
+            'NumeroComprobante': gasto.num_comprobante or '-',
         })
+
+    # Configuración de estilos
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+    red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+    bold_font = Font(bold=True)
+
+    # Crear archivo Excel
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="movimientos_{fecha_inicio}_a_{fecha_fin}.xlsx"'
     wb = Workbook()
     ws = wb.active
-    titulo = f"Movimientos de {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
-    ws.append([titulo])
-    ws.append([])  # Línea vacía
+
+    # Escribir encabezados
+    ws.append([f"Movimientos de {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"])
+    ws.append([])
     ws.append([f'Saldo inicial: {saldo_inicial:,.2f}'])
-    ws.append([])  # Línea vacía
-    encabezados = ['Tipo', 'Fecha', 'Método de Pago', 'Concepto', 'Proveedor', 'Banco', 'Código de Operación', 'Fecha de Operación', 'Monto', 'Notas']
-    for col_num, header in enumerate(encabezados, 1):  # Comienza en la columna A
+    ws.append([])
+
+    encabezados = [
+        'Tipo', 'Fecha', 'Local', 'Método de Pago', 'Comprobante',
+        'Numero de Comprobante', 'Concepto', 'Proveedor', 'Banco',
+        'Código de Operación', 'Fecha de Operación', 'Monto', 'Notas'
+    ]
+
+    for col_num, header in enumerate(encabezados, 1):
         cell = ws.cell(row=5, column=col_num, value=header)
-        cell.font = Font(bold=True)
-    row_num = 6
-    for movimiento in movimientos:
-        ws.cell(row=row_num, column=1, value=movimiento['tipo'])
-        ws.cell(row=row_num, column=2, value=movimiento['fecha'])
-        ws.cell(row=row_num, column=3, value=movimiento['metodo_pago'])
-        ws.cell(row=row_num, column=4, value=movimiento['concepto'])
-        ws.cell(row=row_num, column=5, value=movimiento['proveedor'])
-        ws.cell(row=row_num, column=6, value=movimiento['banco'])
-        ws.cell(row=row_num, column=7, value=movimiento['codigo_operacion'])
-        ws.cell(row=row_num, column=8, value=movimiento['fecha_operacion'])
-        ws.cell(row=row_num, column=9, value=movimiento['monto'])
-        ws.cell(row=row_num, column=10, value=movimiento['notas'])
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_alignment
+        cell.border = thin_border
+
+    row_num = 6  # Fila inicial para datos
+
+    # Escribir ingresos
+    for ingreso in ingresos_list:
+        ws.cell(row=row_num, column=1, value=ingreso['tipo'])
+        ws.cell(row=row_num, column=2, value=ingreso['fecha'])
+        ws.cell(row=row_num, column=3, value=ingreso['local'])
+        ws.cell(row=row_num, column=4, value=ingreso['metodo_pago'])
+        ws.cell(row=row_num, column=5, value=ingreso['Comprobante'])
+        ws.cell(row=row_num, column=6, value=ingreso['NumeroComprobante'])
+        ws.cell(row=row_num, column=7, value=ingreso['concepto'])
+        ws.cell(row=row_num, column=8, value=ingreso['proveedor'])
+        ws.cell(row=row_num, column=9, value=ingreso['banco'])
+        ws.cell(row=row_num, column=10, value=ingreso['codigo_operacion'])
+        ws.cell(row=row_num, column=11, value=ingreso['fecha_operacion'])
+        ws.cell(row=row_num, column=12, value=float(ingreso['monto']))
+        ws.cell(row=row_num, column=13, value=ingreso['notas'])
         row_num += 1
-    ws.append([])  # Línea vacía
-    saldo_final = saldo_inicial + sum(m["monto"] for m in movimientos if m["tipo"] in ["Ingreso", "Extorno"]) - sum(m["monto"] for m in movimientos if m["tipo"] == "Gasto")
+
+    # Total Ingresos
+    if ingresos_list:
+        total_ingresos = sum(i['monto'] for i in ingresos_list)
+        ws.cell(row=row_num, column=1, value='Total Ingresos').font = bold_font
+        ws.cell(row=row_num, column=12, value=float(total_ingresos)).fill = green_fill
+        ws.cell(row=row_num, column=12).font = bold_font
+        row_num += 1
+
+    row_num += 2  # Espacio entre secciones
+
+    # Escribir gastos
+    for gasto in gastos_list:
+        ws.cell(row=row_num, column=1, value=gasto['tipo'])
+        ws.cell(row=row_num, column=2, value=gasto['fecha'])
+        ws.cell(row=row_num, column=3, value=gasto['local'])
+        ws.cell(row=row_num, column=4, value=gasto['metodo_pago'])
+        ws.cell(row=row_num, column=5, value=gasto['Comprobante'])
+        ws.cell(row=row_num, column=6, value=gasto['NumeroComprobante'])
+        ws.cell(row=row_num, column=7, value=gasto['concepto'])
+        ws.cell(row=row_num, column=8, value=gasto['proveedor'])
+        ws.cell(row=row_num, column=9, value=gasto['banco'])
+        ws.cell(row=row_num, column=10, value=gasto['codigo_operacion'])
+        ws.cell(row=row_num, column=11, value=gasto['fecha_operacion'])
+        ws.cell(row=row_num, column=12, value=float(gasto['monto']))
+        ws.cell(row=row_num, column=13, value=gasto['notas'])
+        row_num += 1
+
+    # Total Gastos
+    if gastos_list:
+        total_gastos = sum(g['monto'] for g in gastos_list)
+        ws.cell(row=row_num, column=1, value='Total Gastos').font = bold_font
+        ws.cell(row=row_num, column=12, value=float(total_gastos)).fill = red_fill
+        ws.cell(row=row_num, column=12).font = bold_font
+        row_num += 1
+
+    # Saldo Final
+    total_ingresos = sum(i['monto'] for i in ingresos_list) if ingresos_list else Decimal('0.00')
+    total_gastos = sum(g['monto'] for g in gastos_list) if gastos_list else Decimal('0.00')
+    saldo_final = saldo_inicial + total_ingresos - total_gastos
+    ws.append([])
     ws.append([f'Saldo final: {saldo_final:,.2f}'])
 
-    for col in range(1, 11):  # Ajustamos para que empiece en la columna A
+    # Ajustar anchos de columnas
+    for col in range(1, 14):
         max_length = 0
-        for row in ws.iter_rows(min_col=col, max_col=col):
-            for cell in row:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(cell.value)
-                except:
-                    pass
+        column = chr(64 + col)
+        for cell in ws[column]:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
         adjusted_width = (max_length + 2)
-        ws.column_dimensions[chr(64 + col)].width = adjusted_width
+        ws.column_dimensions[column].width = adjusted_width
+
     wb.save(response)
     return response
+
+
+
+
 
 
 def transferir_yape(request):
@@ -1820,7 +3004,7 @@ def caja_chica(request):
             'concepto_nivel_2_id': gasto.concepto_nivel_2.id if gasto.concepto_nivel_2 else "",
             'concepto_nivel_3_id': gasto.concepto_nivel_3.id if gasto.concepto_nivel_3 else "",
             'tipo_item':gasto.tipo_comprobante,
-            'Eliminar': "Si" if gasto.fecha_gasto == hoy1 else "No"
+            'eliminar': "Si" if gasto.fecha_gasto == hoy1 else "No"
 
         })
 
@@ -2163,6 +3347,7 @@ def guardar_oficial(request):
 
             # Actualizar el campo 'rendido' del gasto asociado
             gasto.rendido = True
+            gasto.fecha_rendido = date.today()
             gasto.save()
 
             # Responder con JSON
@@ -2504,9 +3689,85 @@ def reporte_concepto_proveedor_pdf(request):
     else:
         messages.error(request, "Método no permitido")
         return redirect("reportes")
+def generar_pdf_personal(request):
+    sede_nombre = request.GET.get('sede', 'Todas las Sedes')
+    planilla_filtro = request.GET.get('planilla', 'Todos')
 
+    # Filtrar personal según los parámetros
+    personal = Personal.objects.all()
 
+    if sede_nombre and sede_nombre != "Todas las Sedes":
+        personal = personal.filter(local__nombre_local=sede_nombre)
 
+    if planilla_filtro == "Con planilla":
+        personal = personal.exclude(regimen_salud="ninguno").exclude(regimen_pensionario="ninguno")
+    elif planilla_filtro == "Sin planilla":
+        personal = personal.filter(regimen_salud="ninguno", regimen_pensionario="ninguno")
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="reporte_personal.pdf"'
+
+    doc = SimpleDocTemplate(response, pagesize=landscape(letter), leftMargin=30, rightMargin=30, topMargin=50, bottomMargin=50)
+    elements = []
+
+    # Estilos de texto
+    styles = getSampleStyleSheet()
+    style_table = ParagraphStyle(
+        name="TableStyle",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=10,  # Espaciado entre líneas dentro de la celda
+        alignment=1,  # Centrado
+    )
+
+    # Título con líneas ajustables
+    titulo_texto = f"Reporte de Personal<br/>Sede: {sede_nombre} | Planilla: {planilla_filtro}"
+    titulo = Paragraph(titulo_texto, styles["Title"])
+    elements.append(titulo)
+    elements.append(Spacer(1, 0.3 * inch))  # Espacio antes de la tabla
+
+    # Datos de la tabla con ajuste automático
+    data = [["N° DNI", "Apellidos y Nombres", "Correo Personal", "Celular", "Periodo Inicio", "Periodo Fin", "Sede", "Planilla"]]
+
+    for idx, persona in enumerate(personal, start=1):
+        sede = persona.local.nombre_local if persona.local else "Sin Especificar"
+        es_planilla = "Sí" if persona.regimen_salud != "ninguno" and persona.regimen_pensionario != "ninguno" else "No"
+
+        data.append([
+            persona.dni or "-",
+            Paragraph(persona.apellidos_nombres or "-", style_table),  # Se ajusta dentro de la celda
+            Paragraph(persona.correo_personal or "-", style_table),
+            persona.celular or "-",
+            persona.periodo_inicio.strftime("%d/%m/%Y") if persona.periodo_inicio else "-",
+            persona.periodo_fin.strftime("%d/%m/%Y") if persona.periodo_fin else "-",
+            Paragraph(sede, style_table),
+            es_planilla
+        ])
+
+    # Definir anchos dinámicos para evitar desbordamiento
+    col_widths = [60, 120, 140, 80, 70, 70, 100, 60]
+
+    # Crear la tabla
+    table = Table(data, colWidths=col_widths)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#003366")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING', (0, 0), (-1, 0), 8),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor("#f2f2f2")),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor("#e6e6e6")]),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+    ]))
+
+    elements.append(table)
+    doc.build(elements)
+
+    return response
 
 
 @login_required
@@ -2514,16 +3775,19 @@ def agregar_banco(request):
     if request.method == 'POST':
         nombre_banco = request.POST.get('nombre')
 
-        # Verificar que se haya proporcionado un nombre
         if nombre_banco:
-            # Crear un nuevo banco
             Banco.objects.create(nombre=nombre_banco)
             messages.success(request, 'Banco agregado exitosamente.')
         else:
             messages.error(request, 'El nombre del banco es obligatorio.')
 
-        # Redirigir a la página de ingreso
-        return redirect('ingreso')
+        # Redirige a la misma página desde donde se envió la solicitud
+        return redirect(request.META.get('HTTP_REFERER', 'ingreso'))  # Si no hay REFERER, usa 'ingreso'
+
+    return redirect('ingreso')
+
+
+
 
 def prestamos(request):
     if request.method == 'POST':
@@ -2543,14 +3807,14 @@ def prestamos(request):
             monto_cuota = request.POST.get('monto_cuota')
             notas=request.POST.get('notas')
             # Validación de datos
-            if not all([fecha_prestamo, fecha_vencimiento, numero_cuotas, tea, monto, estado, local_id, dia_pago]):
+            if not all([fecha_prestamo, numero_cuotas, monto, estado, local_id]):
                 messages.error(request, "Todos los campos son requeridos.")
                 return redirect('crear_prestamo')
 
             numero_cuotas = int(numero_cuotas)
-            tea = float(tea)
+            tea = float(tea) if tea not in [None, ""] else 0.0  # Se asigna 0.0 si tea es nulo o vacío
             monto = float(monto)
-            cuota_actual = int(cuota_actual)
+            cuota_actual = int(cuota_actual) if cuota_actual and cuota_actual.isdigit() else 1
             dia_pago = int(dia_pago)  # Convertir a entero
 
             # Obtener proveedor, banco y local si existen
@@ -2561,14 +3825,14 @@ def prestamos(request):
             # Crear el préstamo
             prestamo = Prestamo(
                 fecha_prestamo=fecha_prestamo,
-                fecha_vencimiento=fecha_vencimiento,
+                fecha_vencimiento=fecha_vencimiento if fecha_vencimiento else None,  # Solo se guarda si tiene valor
                 numero_cuotas=numero_cuotas,
                 proveedor=proveedor,
                 tea=tea,
                 banco=banco,
                 analista=analista,
                 monto=monto,
-                estado=estado,
+                estado="proceso" if estado == "nuevo" else estado,  # Se asigna "proceso" si era "nuevo"
                 cuota_actual=cuota_actual,
                 local=local,
                 dia_pago=dia_pago,  # Guardamos el día de pago
@@ -2735,8 +3999,8 @@ def gasto(request):
             tipo_comprobante = data.get('tipo_comprobante')
             nombre_proveedor = data.get('nombre_proveedor')
             observacion = data.get('observacion')
-            codigo_operacion = data.get('codigo_operacion') if metodo_pago != 'efectivo' or tipo_comprobante == 'Deposito en cuenta' else None
-            fecha_operacion = data.get('fecha_operacion') if metodo_pago != 'efectivo' or tipo_comprobante == 'Deposito en cuenta' else None
+            codigo_operacion = data.get('codigo_operacion') if metodo_pago != 'efectivo' else None
+            fecha_operacion = data.get('fecha_operacion') if metodo_pago != 'efectivo' else None
             concepto_nivel_1 = data.get('concepto_nivel_1')
             concepto_nivel_2 = data.get('concepto_nivel_2')
             concepto_nivel_3 = data.get('concepto_nivel_3')
@@ -2746,7 +4010,7 @@ def gasto(request):
             campo_mes=data.get('campo_mes') if tipo_comprobante  in ['Boleta de pago'] else None
             id_requerimiento = data.get('id_requerimiento')  # Nuevo campo
             num_requerimiento = data.get('num_requerimiento')  # Nuevo campo
-            banco_id =data.get('banco_operacion') if tipo_comprobante == 'Deposito en cuenta' else None
+            banco_id =data.get('banco_operacion') if metodo_pago != 'efectivo' else None
             # Buscar la instancia del banco si 'banco_id' no es None
             if banco_id:
                 try:
@@ -2861,76 +4125,50 @@ def gasto(request):
         'nivel_3_conceptos': nivel_3_conceptos,
         'bancos':bancos
     })
+@csrf_exempt
+def finalizar_cuota(request, prestamo_id):
+    if request.method == "POST":
+        try:
+            prestamo = Prestamo.objects.get(id=prestamo_id)
+            if prestamo.cuota_actual < prestamo.numero_cuotas:
+                prestamo.cuota_actual += 1
+                prestamo.save()
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'error': 'El préstamo ya está finalizado.'}, status=400)
+        except Prestamo.DoesNotExist:
+            return JsonResponse({'error': 'Préstamo no encontrado.'}, status=404)
 
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
 def ver_prestamos(request):
     # Obtener todos los préstamos
     prestamos = Prestamo.objects.all()
     bancos = Banco.objects.all()
-    # Agregar la fecha de vencimiento calculada y el estado de las cuotas
-    prestamos_data = []
+    return render(request, 'ver_prestamos.html', {'prestamos_data': prestamos ,'bancos': bancos  })
 
-    for prestamo in prestamos:
-        # Calcular la fecha de vencimiento y la cuota a pagar
-        fecha_vencimiento = prestamo.fecha_vencimiento
-        fecha_inicial = prestamo.fecha_prestamo  # Tomamos la fecha del préstamo como la fecha inicial
-        numero_cuotas = prestamo.numero_cuotas
-        cuota_actual = prestamo.cuota_actual
-        dia_pago = prestamo.dia_pago
-        proveedor = prestamo.proveedor  # Obtener el proveedor relacionado
-        monto=prestamo.monto
-        # Obtener la fecha actual
-        fecha_actual = timezone.now().date()
-
-        # Calcular la fecha de pago en base a la cuota actual
-        mes_pago = fecha_inicial.month + cuota_actual
-        año_pago = fecha_inicial.year
-
-        # Si el mes supera 12, ajustar el año
-        while mes_pago > 12:
-            mes_pago -= 12
-            año_pago += 1
-
-        # Crear la fecha de pago con el día de pago asignado
-        try:
-            fecha_pago = fecha_inicial.replace(year=año_pago, month=mes_pago, day=dia_pago)
-        except ValueError:
-            # Manejo si el mes no tiene el día exacto (ejemplo: 30 de febrero)
-            from calendar import monthrange
-            ultimo_dia = monthrange(año_pago, mes_pago)[1]
-            fecha_pago = fecha_inicial.replace(year=año_pago, month=mes_pago, day=ultimo_dia)
-
-        # Asegurar que la fecha de pago no sea posterior a la fecha de vencimiento
-        if fecha_pago > fecha_vencimiento:
-            fecha_pago = fecha_vencimiento
-
-        estado = prestamo.estado  # Puedes agregar lógica si el estado es "proceso" o algún otro valor
-        prestamos_data.append({
-            'id':prestamo.id,
-            'prestamo': prestamo,
-            'fecha_vencimiento': fecha_vencimiento,
-            'fecha_inicial': fecha_inicial,
-            'numero_cuotas': numero_cuotas,
-            'cuota_actual': cuota_actual,
-            'fecha_pago': fecha_pago,
-            'proveedor': proveedor,
-            'estado': estado,  # Agregar el estado aquí
-            'monto':monto,
-            'monto_cuota':prestamo.monto_cuota,
-        })
-
-    return render(request, 'ver_prestamos.html', {'prestamos_data': prestamos_data ,'bancos': bancos  })
-
-
+def ver_pagos(request, prestamo_id):
+    try:
+        prestamo = Prestamo.objects.get(id=prestamo_id)
+        pagos = Pago.objects.filter(prestamo=prestamo, cuota=prestamo.cuota_actual).values(
+            'fecha_pago', 'monto_pagado', 'cuota', 'notas'
+        )
+        return JsonResponse({'pagos': list(pagos)})
+    except Prestamo.DoesNotExist:
+        return JsonResponse({'error': 'Préstamo no encontrado'}, status=404)
 
 def ficha_ingreso_view(request):
     bancos = Banco.objects.all()
-    return render(request, "ficha_ingreso.html",{'bancos':bancos})
+    locales = Local.objects.all()
+
+    return render(request, "ficha_ingreso.html",{'bancos':bancos,'locales':locales})
 
 def realizar_pago(request):
     if request.method == 'POST':
         prestamo_id = request.POST.get('prestamo_id', '').strip()
         monto_pagado = request.POST.get('monto_pagado', '').strip()
         fecha_pago = request.POST.get('fecha_pago', '').strip()
+        # Campos para medio de pago
+        medio_pago = request.POST.get('medio_pago', '').strip()  # "efectivo", "deposito" o "transferencia"
         banco_id = request.POST.get('banco', '').strip()
         codigo_operacion = request.POST.get('codigo_operacion', '').strip()
         fecha_operacion = request.POST.get('fecha_operacion', '').strip()
@@ -2961,30 +4199,35 @@ def realizar_pago(request):
             messages.warning(request, "⚠️ Este préstamo ya ha sido cancelado.")
             return redirect('ver_prestamos')
 
-        total_pagado = prestamo.pagos.filter(cuota=cuota_actual).aggregate(Sum('monto_pagado'))['monto_pagado__sum'] or Decimal(0)
 
         Pago.objects.create(
             prestamo=prestamo,
             cuota=cuota_actual,
             monto_pagado=monto_pagado,
-            fecha_pago=fecha_pago
+            fecha_pago=fecha_pago,
+            notas=nota
         )
-
-
-        total_pagado += monto_pagado
-
-        if total_pagado >= monto_cuota:
-            prestamo.cuota_actual += 1
-            if prestamo.cuota_actual > numero_cuotas:
-                prestamo.estado = "terminado"
-                messages.success(request, "✅ Pago registrado. ¡Préstamo completado! 🎉")
-            else:
-                messages.success(request, f"✅ Pago registrado. Cuota {cuota_actual} completada. Próxima cuota: {prestamo.dia_pago} del siguiente mes.")
-        else:
-            restante = monto_cuota - total_pagado
-            messages.warning(request, f"⚠️ Pago parcial registrado. Falta cancelar S/{restante:.2f} para completar la cuota {cuota_actual}.")
-
         prestamo.save()
+            # Configurar tipo de pago según el medio seleccionado
+        if medio_pago == "efectivo":
+            tipo_pago = "efectivo"
+            tipo_comprobante = "Sin comprobante"
+            # Para efectivo, los campos de banco, código y fecha de operación se ignoran
+            banco_id = None
+            codigo_operacion = ""
+            fecha_operacion = ""
+        elif medio_pago in ["deposito", "transferencia"]:
+            tipo_pago = "transferencia"
+            # Se puede diferenciar si es depósito o transferencia, si se requiere:
+            tipo_comprobante = "Deposito en cuenta" if medio_pago == "Deposito en cuenta" else "Transferencia"
+        else:
+            # Valor por defecto en caso de no seleccionar un medio adecuado
+            tipo_pago = "efectivo"
+            tipo_comprobante = "Sin comprobante"
+            banco_id = None
+            codigo_operacion = ""
+            fecha_operacion = ""
+
         # Obtener o crear el concepto de nivel 1 (PAGO DE PRÉSTAMOS)
         concepto_nivel_1, created = Concepto.objects.get_or_create(
                 concepto_nombre="PAGO DE PRESTAMOS",
@@ -3003,13 +4246,13 @@ def realizar_pago(request):
             usuario_creador=request.user,
             fecha_gasto=now().date(),
             prestamo=prestamo,
-            banco_id=banco_id,
-            fecha_operacion=fecha_operacion,
+            banco_id=banco_id,  # Solo tendrá valor si el medio de pago es depósito o transferencia
+            fecha_operacion = fecha_operacion if medio_pago != "efectivo" else None,
             codigo_operacion=codigo_operacion,
             importe=monto_pagado,
             moneda="Soles",
-            tipo_pago="transferencia",
-            tipo_comprobante="Deposito en cuenta",
+            tipo_pago=tipo_pago,
+            tipo_comprobante=tipo_comprobante,
             nombre_proveedor=prestamo.proveedor,  # Asociar el proveedor del préstamo
             local=prestamo.local,  # Asociar el local del préstamo
             observacion=nota,  # Se guarda la nota en el gasto también
@@ -3017,7 +4260,7 @@ def realizar_pago(request):
             concepto_nivel_2=concepto_nivel_2,
             concepto_nivel_3=None
         )
-
+        messages.success(request, "✅ Pago registrado ,se creo un Gasto !  🎉")
         return redirect('ver_prestamos')
 
     return HttpResponse(status=405)

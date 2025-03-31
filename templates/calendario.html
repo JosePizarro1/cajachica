@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+{% block content %}
+{% load static %}
+<!-- FullCalendar y Scripts -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.5/dist/tailwind.min.css" rel="stylesheet">
+<!-- FullCalendar CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/6.1.15/index.global.css">
+<!-- Font Awesome para íconos -->
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- FullCalendar JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/6.1.15/index.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- Librería RRule -->
+<script src="https://cdn.jsdelivr.net/npm/rrule@2.6.8/dist/es5/rrule.min.js"></script>
+<!-- Plugin RRule para FullCalendar (asegúrate de usar la versión compatible con FullCalendar 6) -->
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.15/index.global.min.js"></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
+<style>
+  /* Animación de entrada para eventos */
+  .animate-pop-in {
+      animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+
+  @keyframes popIn {
+      0% {
+          opacity: 0;
+          transform: scale(0.8);
+      }
+      50% {
+          opacity: 1;
+          transform: scale(1.05);
+      }
+      100% {
+          transform: scale(1);
+      }
+  }
+
+  /* Animación de pulso para destacar */
+  .animate-pulse-twice {
+      animation: pulseTwice 1s ease;
+  }
+
+  @keyframes pulseTwice {
+      0%, 100% { transform: scale(1); }
+      25%, 75% { transform: scale(1.03); }
+      50% { transform: scale(1.05); }
+  }
+
+  /* Estilo especial para eventos pagados */
+  .evento-pagado {
+      box-shadow: 0 3px 6px rgba(126, 211, 33, 0.3);
+      border-left: 4px solid #5AAE20 !important;
+      transition: all 0.3s ease;
+  }
+
+  .evento-pagado:hover {
+      box-shadow: 0 5px 15px rgba(126, 211, 33, 0.4);
+      transform: translateY(-2px);
+  }
+
+  /* Estilo para el icono de ojo */
+  .evento-pagado .fc-event-title::before {
+      margin-right: 5px;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
+  }
+</style>
+<style>
+  /* Agrega un margen inferior entre eventos para que no se vean tan juntos */
+  .fc-event {
+    margin-bottom: 4px; /* Ajusta el valor según prefieras */
+    cursor: pointer;    /* Cambia el cursor a la manito al pasar el mouse */
+  }
+  /* Reducir el alto mínimo de cada celda de día */
+
+
+  /* Reducir el padding del contenedor de eventos */
+  .fc-daygrid-day-events {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  /* Reducir el margen entre eventos */
+  .fc-daygrid-event {
+    margin-bottom: 2px !important;
+  }
+  .fc-toolbar-title {
+  text-transform: capitalize;
+}
+/* Ajuste de los botones del grupo */
+.fc .fc-button-group > .fc-button {
+    flex: 1 1 auto !important;
+    position: relative !important;
+}
+
+/* Asegurar que los botones sean clickeables */
+.fc .fc-button:not(:disabled) {
+    cursor: pointer !important;
+}
+
+/* Personalizar colores de los botones primarios */
+.fc .fc-button-primary {
+    background-color: #3b82f6 !important; /* Azul Tailwind */
+    border-color: #2563eb !important;
+    color: white !important;
+}
+
+/* Quitar bordes redondeados innecesarios */
+.fc .fc-button {
+    border-radius: 4px !important;
+    font-size: 14px !important;
+    padding: 6px 12px !important;
+}
+
+/* Ajustar el tamaño de los botones de cambio de vista */
+.fc-toolbar-chunk .fc-button {
+    min-width: 100px !important;
+    text-transform: capitalize !important;
+}
+/* Animación personalizada para el botón rojo */
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+.animate-pulse {
+  animation: pulse-opacity 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+</style>
+
+
+<!-- Contenido Principal -->
+<div id="mainContent" class="container mx-auto mt-2 px-4 flex gap-4">
+
+<!-- Columna Izquierda: Botones -->
+<div class="w-1/9 flex flex-col items-start space-y-4">
+  <!-- Botón Agregar (existente) -->
+  <button class="relative bg-green-500 text-white py-3 px-6 rounded-lg shadow-md flex items-center gap-3 text-sm hover:bg-green-600 transition-transform transform hover:scale-105 active:scale-95"
+    data-modal-target="eventModal">
+    <i class="fas fa-plus text-white text-lg"></i>
+    <!-- Animación de Ping -->
+    <span class="absolute top-1 right-1 -mt-2 -mr-2 flex h-4 w-4">
+      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-700 opacity-75"></span>
+      <span class="relative inline-flex rounded-full h-4 w-4 bg-green-800"></span>
+    </span>
+  </button>
+
+  <!-- Nuevo Botón Ver Eventos Pagados -->
+  <button id="verEventosPagadosBtn"
+          class="relative bg-gradient-to-r from-red-400 to-red-500 text-white py-3 px-6 rounded-lg shadow-md flex items-center gap-3 text-sm hover:from-red-500 hover:to-red-600 transition-all transform hover:scale-105 active:scale-95"
+          onclick="verEventosPagados()">
+    <i class="fas fa-eye text-white text-lg"></i>
+    <!-- Animación de pulso suave -->
+    <span class="absolute top-1 right-1 -mt-2 -mr-2 flex h-4 w-4">
+      <span class="animate-pulse absolute inline-flex h-full w-full rounded-full bg-red-800 opacity-100"></span>
+    </span>
+  </button>
+
+  <button id="generarReporteBtn"
+  class="relative bg-gradient-to-r from-purple-500 to-purple-600 text-white py-3 px-6 rounded-lg shadow-md flex items-center gap-3 text-sm hover:from-purple-600 hover:to-purple-700 transition-all transform hover:scale-105 active:scale-95"
+  data-modal-target="reportModal">  <!-- Cambiado a reportModal -->
+  <i class="fas fa-file-alt text-white text-lg"></i>
+  <span class="absolute top-1 right-1 -mt-2 -mr-2 flex h-4 w-4">
+  <span class="animate-pulse absolute inline-flex h-full w-full rounded-full bg-purple-800 opacity-100"></span>
+  </span>
+</button>
+
+</div>
+
+  <!-- Columna Derecha: Calendario -->
+<!-- Columna Derecha: Calendario -->
+<div class="w-3/4 bg-white shadow-lg rounded-lg overflow-hidden">
+  <!-- Total a pagar con estilo de header de modal -->
+  <div class="bg-gradient-to-r from-blue-400 to-blue-500 p-4">
+    <div class="flex items-center justify-center space-x-2">
+      <p id="totalMontoMes" class="text-center text-xl font-bold text-white">
+        Total a pagar este mes: <span class="text-yellow-200">S/ 0.00</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- Calendario -->
+  <div id="calendar" class="p-4"></div>
+</div>
+
+</div>
+
+<!-- Modal para Reportes -->
+<div id="reportModal" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center hidden">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+    <!-- Header con gradiente morado -->
+    <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-t-xl p-4">
+      <div class="flex justify-between items-center">
+        <h5 class="text-xl font-semibold text-white">Generar Reporte</h5>
+        <button id="closeReportModal" class="text-white hover:text-purple-200 transition-colors">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Contenido del formulario -->
+    <div class="p-6 space-y-6">
+      <!-- Rango de fechas -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="reportStartDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
+          <input type="date" id="reportStartDate" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-200 focus:border-purple-500 transition-all" required>
+        </div>
+        <div>
+          <label for="reportEndDate" class="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+          <input type="date" id="reportEndDate" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-200 transition-all" required>
+        </div>
+      </div>
+
+      <!-- Botones de exportación -->
+      <div class="flex justify-center space-x-4 pt-4">
+        <button id="exportExcelBtn" class="px-5 py-2.5 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed" disabled>
+          <i class="fas fa-file-excel mr-2"></i> Excel
+        </button>
+        <button id="exportPdfBtn" class="px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center"
+                onclick="generarReportePDF()">
+          <i class="fas fa-file-pdf mr-2"></i> PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% include "modal_agregar_calendario.html" %}
+{% include "modal_detalles_calendario.html" %}
+
+
+<script>
+  // Función para generar PDF (ejemplo básico)
+  function generarReportePDF() {
+    const startDate = document.getElementById('reportStartDate').value;
+    const endDate = document.getElementById('reportEndDate').value;
+
+    if (!startDate || !endDate) {
+      alert('Por favor seleccione ambas fechas');
+      return;
+    }
+
+    // Redireccionar a la URL del reporte PDF
+    window.location.href = `/generar_reporte_pdf_calendario/?inicio=${startDate}&fin=${endDate}`;
+  }
+
+  // Manejo del modal
+  document.getElementById('generarReporteBtn').addEventListener('click', () => {
+    document.getElementById('reportModal').classList.remove('hidden');
+  });
+
+  document.getElementById('closeReportModal').addEventListener('click', () => {
+    document.getElementById('reportModal').classList.add('hidden');
+  });
+  </script>
+<script>
+// Variable global para rastrear el estado
+let eventosPagadosMostrados = false;
+let eventosPagadosIds = [];
+
+function verEventosPagados() {
+    if (eventosPagadosMostrados) {
+        // Si ya están mostrados, los removemos
+        removerEventosPagados();
+        eventosPagadosMostrados = false;
+
+        // Feedback al usuario
+        Swal.fire({
+            title: 'Eventos Ocultados',
+            text: 'Los eventos pagados han sido ocultados',
+            icon: 'success',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    } else {
+        // Si no están mostrados, los cargamos
+        cargarEventosPagados();
+    }
+}
+
+function cargarEventosPagados() {
+    $.ajax({
+        url: '/obtener-eventos-pagados/',
+        method: 'GET',
+        success: function(response) {
+            eventosPagadosIds = [];
+
+            response.forEach(function(evento) {
+                const newEvent = window.myCalendar.addEvent({
+                    id: `pagado_${evento.id}`,
+                    title: `${evento.title}`,  // Icono de ojo
+                    start: evento.start,
+                    end: evento.end,
+                    allDay: evento.allDay,
+                    color: '#7ED321',  // Verde más vibrante
+                    textColor: '#FFFFFF',  // Texto blanco
+                    borderColor: '#5AAE20',  // Borde más oscuro
+                    className: 'evento-pagado animate-pop-in',  // Clases para animación
+                    extendedProps: {
+                        ...evento.extendedProps,
+                        pagado: true,
+                        esEventoPagado: true
+                    }
+                });
+
+                if (newEvent) {
+                    eventosPagadosIds.push(newEvent.id);
+
+                    // Efecto visual al añadir el evento
+                    setTimeout(() => {
+                        const eventElement = document.querySelector(`[data-event-id="${newEvent.id}"]`);
+                        if (eventElement) {
+                            eventElement.classList.add('animate-pulse-twice');
+                        }
+                    }, 100);
+                }
+            });
+
+            eventosPagadosMostrados = true;
+
+            // Notificación con estilo mejorado
+            Swal.fire({
+                title: '<span style="color: #7ED321">✓ Eventos Pagados</span>',
+                html: `<div style="border-left: 4px solid #7ED321; padding-left: 1rem;">
+                         <p>Se mostraron <b>${response.length}</b> eventos pagados</p>
+                       </div>`,
+                icon: 'success',
+                timer: 3000,
+                showConfirmButton: false,
+            });
+        },
+        error: function(xhr, status, error) {
+            console.error('Error al cargar eventos pagados:', error);
+            Swal.fire({
+                title: '<span style="color: #FF6B6B">✗ Error</span>',
+                html: `<div style="border-left: 4px solid #FF6B6B; padding-left: 1rem;">
+                         <p>No se pudieron cargar los eventos pagados</p>
+                       </div>`,
+                icon: 'error',
+                timer: 3000,
+                showConfirmButton: false,
+                background: '#FFF6F6'
+            });
+        }
+    });
+}
+
+function removerEventosPagados() {
+    eventosPagadosIds.forEach(id => {
+        const event = window.myCalendar.getEventById(id);
+        if (event) {
+            event.remove();
+        }
+    });
+    eventosPagadosIds = [];
+}
+  </script>
+
+<script>
+  function actualizarEventos() {
+  $.ajax({
+    url: '/obtener-eventos/',
+    method: 'GET',
+    success: function(response) {
+      // Limpia los eventos actuales del calendario
+      window.myCalendar.removeAllEvents();
+      // Re-agrega el evento de fondo para fines de semana
+            window.myCalendar.addEvent({
+        display: 'background',
+        daysOfWeek: [0, 6],
+        backgroundColor: '#FFCDD2'
+      });
+
+      // Agrega cada evento recibido por Ajax
+      response.forEach(function(evento) {
+        window.myCalendar.addEvent(evento);
+      });
+    },
+    error: function(xhr, status, error) {
+      console.error('Error al actualizar los eventos:', error);
+    }
+  });
+}
+
+
+</script>
+<script>
+  $(document).ready(function() {
+
+    var calendarEl = $('#calendar')[0];
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      locale: 'es',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek,multiMonthYear'
+      },
+      datesSet: function(info) {
+            // 🔹 Detecta cambios de mes y actualiza el total
+            const newMonth = info.view.currentStart.getMonth() + 1;
+            const newYear = info.view.currentStart.getFullYear();
+
+            console.log(`Cambiando al mes: ${newMonth}, año: ${newYear}`);
+            actualizarTotalMes(newMonth, newYear);
+        },
+      buttonText: {
+        today: 'Hoy',
+        month: 'Mes',
+        week: 'Semana',
+        day: 'Día',
+        listWeek: 'Lista Semanal',
+        multiMonthYear: 'Año'
+
+      },
+      views: {
+      multiMonthYear: {
+        type: 'multiMonthYear',  // Se indica el tipo de vista
+        stacked: true,           // Esto configura la vista en una única columna (stack)
+        // Opcional: define cuántos meses se muestran (por ejemplo, 12 para todo el año)
+        months: 12
+      }
+    },
+
+      selectable: true,
+      editable: false,
+      dayMaxEvents: 3, // Si hay más de 3 eventos, se muestra "+n más"
+      // Al hacer clic en un evento se muestra el modal de detalles con animación
+      eventClick: function(info) {
+        var event = info.event;
+        var eventMasterId = event.extendedProps.evento_id; // Obtener el ID del evento maestro
+        window.currentEventId = event.id;
+        window.currentEventMasterId = event.extendedProps.evento_id; // ID del evento maestro
+
+        console.log("ID de la ocurrencia seleccionada:", window.currentEventId);
+        console.log("ID del evento maestro:", eventMasterId);
+
+        // Opciones para formatear la fecha completa en español, e.g. "5 de marzo de 2025"
+        var options = { day: 'numeric', month: 'long', year: 'numeric' };
+        var startDateFormatted = event.start ? event.start.toLocaleDateString('es-ES', options) : '';
+        var endDateFormatted = event.end ? event.end.toLocaleDateString('es-ES', options) : '';
+        var recurrenciaMap = {
+          'none': 'No se repite',
+          'daily': 'Diario',
+          'weekly': 'Semanal',
+          'monthly': 'Mensual'
+        };
+        // Establece el título en la cabecera del modal
+        $('#detailTitleHeader').text(event.title);
+
+        // Establece las fechas y demás detalles
+        $('#detailStart').text(startDateFormatted);
+        $('#detailEnd').text(endDateFormatted);
+        // Nota: Asegúrate de guardar la propiedad de recurrencia como "recurrencia" en extendedProps
+        $('#detailRepeat').text(recurrenciaMap[event.extendedProps.recurrencia] || event.extendedProps.recurrencia);
+        $('#detailAmount').text(event.extendedProps.monto || '');
+        $('#detailNotes').text(event.extendedProps.notas || '');
+            // 🔹 Mostrar si el evento es un préstamo
+        window.currentEventPrestamo = info.event.extendedProps.prestamo;
+
+
+            // Mostrar información sobre si es préstamo (solo indicador, no de pagado)
+        if (event.extendedProps.prestamo) {
+            $('#detailPrestamo').html('<i class="fas fa-check-circle text-green-500 fa-lg"></i>').removeClass('hidden');
+        } else {
+            $('#detailPrestamo').html('<i class="fas fa-times-circle text-red-500 fa-lg"></i>').removeClass('hidden');
+        }
+
+        // Aquí usamos la propiedad esEventoPagado para controlar los botones:
+        if (event.extendedProps.esEventoPagado) {
+            // Si el evento ya está pagado, ocultamos ambos botones
+            $('#payEvent').addClass('hidden');
+            $('#marcarEvento').addClass('hidden');
+        } else {
+            // Si no está pagado, se muestran según la lógica:
+            // Por ejemplo, si es préstamo, quizás solo se muestre "Marcar como Pagado"
+            if (event.extendedProps.prestamo) {
+                $('#payEvent').addClass('hidden');
+                $('#marcarEvento').removeClass('hidden');
+            } else {
+                $('#payEvent').removeClass('hidden');
+                $('#marcarEvento').removeClass('hidden');
+            }
+        }
+        // Abrir el modal de detalles con transición fadeIn
+        $('#eventDetailsModal').removeClass('hidden').hide().fadeIn(600);
+      },
+      events: [
+    {
+      display: 'background',
+      daysOfWeek: [0, 6],
+      backgroundColor: '#FFCDD2'
+    }
+  ]
+    });
+    calendar.render();
+    window.myCalendar = calendar;
+    actualizarEventos();  // Para que cargue al inicio
+    actualizarTotalMes(new Date().getMonth() + 1, new Date().getFullYear());
+
+
+    // Cerrar modal Detalle del Evento con fadeOut
+    $('#closeDetailsModal').on('click', function() {
+      $('#eventDetailsModal').fadeOut(300, function() {
+        $(this).addClass('hidden').css('display', '');
+      });
+    });
+
+
+    window.myCalendar = calendar;
+
+  });
+  function actualizarTotalMes(mes, anio) {
+    console.log(`Obteniendo total para: Mes ${mes}, Año ${anio}`);
+
+    $.ajax({
+        url: `/obtener-total-mes/?mes=${mes}&anio=${anio}`,
+        method: 'GET',
+        success: function(response) {
+            let totalTexto = `Total a pagar en ${mes}/${anio}: S/ ${response.total}`;
+
+            let totalElemento = document.getElementById("totalMontoMes");
+            if (!totalElemento) {
+                totalElemento = document.createElement("p");
+                totalElemento.id = "totalMontoMes";
+                totalElemento.className = "text-center text-lg font-semibold mt-2";
+                document.getElementById("calendar").before(totalElemento);
+            }
+            totalElemento.textContent = totalTexto;
+        },
+        error: function(xhr, status, error) {
+            console.error('Error al obtener el total del mes:', error);
+        }
+    });
+}
+</script>
+
+
+<script src="{% static 'js/modal_agregar_calendario.js' %}"></script>
+{% endblock %}

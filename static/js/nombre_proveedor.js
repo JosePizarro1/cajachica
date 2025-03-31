@@ -12,7 +12,7 @@ $(document).ready(function () {
     const numRequerimientoContainer = document.getElementById('num-requerimiento-container');
     const campoContainer = document.getElementById('campo-area-container');
     const campoMesContainer = document.getElementById('campo-mes-container');
-    const BancoContainer = document.getElementById('banco-container');
+    const bancoContainer = document.getElementById('banco-container');
 
     const btnGuardar = document.getElementById('btn-guardar');
     // Mostrar/Ocultar campos din¨¢micos para Factura, Boleta o RHE
@@ -101,9 +101,12 @@ $(document).ready(function () {
       if (metodoPagoSelect.value !== 'efectivo') {
         codigoOperacionContainer.style.display = 'block';
         fechaOperacionContainer.style.display = 'block';
+         bancoContainer.style.display='block';
+
       } else {
         codigoOperacionContainer.style.display = 'none';
         fechaOperacionContainer.style.display = 'none';
+        bancoContainer.style.display='none';
       }
     });
 });

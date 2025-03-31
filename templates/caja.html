@@ -624,10 +624,7 @@ document.getElementById('downloadExcelBtn').addEventListener('click', function()
                 document.getElementById("modalTitle").innerText = "Editar Movimiento";
                 document.getElementById("movimientoTipo").value = "";
 
-                // Resetear Select2 de conceptos
-                $("#concepto_nivel_1_results").val(null).trigger("change");
-                $("#concepto_nivel_2_results").val(null).trigger("change");
-                $("#concepto_nivel_3_results").val(null).trigger("change");
+
 
                 // Ocultar la sección de conceptos por defecto
                 let conceptosSection = document.getElementById("conceptosSection");
@@ -670,14 +667,14 @@ document.getElementById('downloadExcelBtn').addEventListener('click', function()
                                 $("#concepto_nivel_2_results").val(concepto2).trigger("change");
                                 console.log("✅ Nivel 2 preseleccionado:", concepto2);
                             }
-                        }, 300);
+                        }, 500);
 
                         setTimeout(() => {
                             if (concepto3) {
                                 $("#concepto_nivel_3_results").val(concepto3).trigger("change");
                                 console.log("✅ Nivel 3 preseleccionado:", concepto3);
                             }
-                        }, 500);
+                        }, 800);
                     }
                 } else {
                     console.log("📌 Tipo NO es 'Gasto', ocultando select de conceptos.");

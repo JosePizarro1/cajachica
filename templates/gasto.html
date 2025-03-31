@@ -12,7 +12,11 @@
 
 <main class="flex-1 p-8">
           <h2 class="text-3xl font-bold mb-6">Registrar Gastos en Caja</h2>
-
+<div class="mb-6">
+  <button type="button" class="bg-green-600 hover:bg-green-700 text-white p-3 rounded-lg transition duration-300" onclick="openModal('agregarBancoModal')">
+    Agregar Banco
+  </button>
+</div>
   <!-- Formulario -->
   <div class="bg-white shadow-md rounded-lg p-6">
     {% include 'mensaje.html' %}
@@ -46,7 +50,6 @@
             <option value="Sin Requerimiento">Sin Requerimiento</option>
             <option value="Sin Comprobante">Sin Comprobante</option>
             <option value="Boleta de pago">Boleta de pago</option>
-            <option value="Deposito en cuenta">Deposito en Cuenta</option>
 
           </select>
         </div>
@@ -97,18 +100,6 @@
         </select>
       </div>
 
-<!-- Banco (dinámico) -->
-<div id="banco-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
-  <label for="banco_operacion" class="block text-sm font-medium">Banco :</label>
-  <!-- Select de Banco -->
-  <select id="banco_operacion" name="banco_operacion" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-accent focus:border-accent bg-gray-700 text-white">
-    <option value="" disabled selected>Seleccionar Banco</option>
-    {% for banco in bancos %}
-      <option value="{{ banco.id }}" class="bg-gray-700 hover:bg-gray-600">{{ banco.nombre }}</option>
-    {% endfor %}
-  </select>
-</div>
-
 
 
         <!-- Código de Comprobante -->
@@ -133,11 +124,27 @@
           <option value="transferencia">Transferencia</option>
           <option value="IZIPAY">IZIPAY</option>
           <option value="IZIPAY YA">IZIPAY YA</option>
+        <option value="Deposito en cuenta">Deposito en Cuenta</option>
 
 
 
         </select>
       </div>
+
+          <!-- Banco (dinámico) -->
+    <div id="banco-container"  class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
+      <label for="banco_operacion" class="block text-sm font-medium">Banco :</label>
+
+      <!-- Select de Banco -->
+      <select id="banco_operacion" name="banco_operacion" class="mt-1 block w-full bg-gray-700 text-white rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+        <option value="" disabled selected>Seleccionar Banco</option>
+        {% for banco in bancos %}
+          <option value="{{ banco.id }}">{{ banco.nombre }}</option>
+        {% endfor %}
+      </select>
+
+    </div>
+
       <!-- Código de Operación (dinámico) -->
       <div id="codigo-operacion-container" class="bg-gray-800 text-white p-4 rounded-lg shadow-md" style="display: none;">
         <label for="codigo_operacion" class="block text-sm font-medium">Código de Operación:</label>
@@ -238,11 +245,45 @@
               Guardar
             </button>
         </div>
+        <!-- Modal para agregar banco -->
+<div id="agregarBancoModal" class="fixed inset-0 z-50 hidden bg-gray-800 bg-opacity-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen">
+        <!-- Contenido del Modal -->
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+            <h2 class="text-2xl font-bold mb-4 text-center">Agregar Banco</h2>
+            <!-- Formulario de agregar banco -->
+            <form method="POST" action="{% url 'agregar_banco' %}">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="id_nombre" class="block text-sm font-medium text-gray-700">Nombre del Banco</label>
+                    <input type="text" id="id_nombre" name="nombre" class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre del Banco" required>
+                </div>
+
+                <div class="flex justify-end space-x-4">
+                    <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600" onclick="closeModal('agregarBancoModal')">Cerrar</button>
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 </main>
 
 <!-- Script para Confirmación y Validación -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="{% static 'js/nombre_proveedor.js' %}"></script>
+<script>
+  // Función para abrir el modal
+  function openModal(modalId) {
+      document.getElementById(modalId).classList.remove('hidden');
+  }
+
+  // Función para cerrar el modal
+  function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+  }
+</script>
+
 <script>
     // Configurar csrf token
     $.ajaxSetup({

@@ -23,7 +23,7 @@
 
 
 
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class=" mx-auto px-4 py-6">
     <div class="bg-white shadow-lg rounded-lg p-6">
         <h2 class="text-3xl font-bold text-gray-700 mb-6 text-center">Listado de Préstamos</h2>
         <!-- Filtros -->
@@ -32,7 +32,7 @@
             <select id="estadoFiltro" class="p-2 border border-gray-300 rounded-md">
                 <option value="todos">Todos</option>
                 <option value="proceso">Proceso</option>
-                <option value="completado">Completado</option>
+                <option value="terminado">Completado</option>
             </select>
         </div>
         <div class="overflow-x-auto">
@@ -40,11 +40,10 @@
                 <thead class="bg-blue-600 text-white uppercase text-sm">
                     <tr>
                         <th class="py-3 px-4 text-left">ID</th>
-                        <th class="py-3 px-4 text-left">Fecha Inicial</th>
+                        <th class="py-3 px-4 text-left">Fecha de Prestamo</th>
                         <th class="py-3 px-4 text-left">Fecha de Vencimiento</th>
                         <th class="py-3 px-4 text-left">Número de Cuotas</th>
                         <th class="py-3 px-4 text-left">Cuota Actual</th>
-                        <th class="py-3 px-4 text-left">Fecha de Pago</th>
                         <th class="py-3 px-4 text-left">Préstamo</th>
                         <th class="py-3 px-4 text-left">Monto Cuota</th>
                         <th class="py-3 px-4 text-left">Proveedor</th>
@@ -56,30 +55,44 @@
                     {% for data in prestamos_data %}
                     <tr class="border-b hover:bg-gray-100 transition">
                         <td class="py-3 px-4">{{ data.id }}</td>
-                        <td class="py-3 px-4">{{ data.fecha_inicial|date:"d/m/Y" }}</td>
+                        <td class="py-3 px-4">{{ data.fecha_prestamo|date:"d/m/Y" }}</td>
                         <td class="py-3 px-4">{{ data.fecha_vencimiento|date:"d/m/Y" }}</td>
                         <td class="py-3 px-4">{{ data.numero_cuotas }}</td>
-                        <td class="py-3 px-4">{{ data.cuota_actual }}/{{ data.numero_cuotas }}</td>
-                        <td class="py-3 px-4">{{ data.fecha_pago|date:"d/m/Y" }}</td>
+                        <td class="py-3 px-4">
+                            {% if data.estado == "terminado" %}
+                                <i class="fas fa-check-circle text-green-500"></i>
+                            {% else %}
+                                {{ data.cuota_actual }}/{{ data.numero_cuotas }}
+                            {% endif %}
+                        </td>
                         <td class="py-3 px-4">{{ data.monto }}</td>
                         <td class="py-3 px-4">{{ data.monto_cuota }}</td>
                         <td class="py-3 px-4">{{ data.proveedor.razon_social }}</td>
                         <td class="py-3 px-4">{{ data.notas }}</td>
                         <td class="py-3 px-4 text-center">
-                            {% if data.estado == "proceso" %}
-                                <button class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-700 transition open-modal"
-                                    data-target="#pagoModal{{ data.id }}">
-                                    <i class="fas fa-sync-alt"></i> Pagar
-                                </button>
-                            {% else %}
+                            {% if data.estado == "terminado" %}
                                 <span class="bg-green-500 text-white px-4 py-2 rounded-full">Completado</span>
+                            {% else %}
+                                <button class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:opacity-80 transition open-modal"
+                                    data-target="#pagoModal{{ data.id }}">
+                                    <i class="fas fa-sync-alt"></i>Pagar
+                                </button>
+                                <button onclick="verPagos({{ data.id }})" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:opacity-80 transition ml-2">
+                                    <i class="fas fa-eye"></i>Pagos
+                                </button>
                             {% endif %}
                         </td>
+
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+<div id="pagos-container" class="mx-auto mt-6 px-4 hidden">
+    <div id="pagos-body" >
+
     </div>
 </div>
 
@@ -102,25 +115,37 @@
                     <label class="block text-sm font-medium text-gray-700">Monto Pagado</label>
                     <input type="number" name="monto_pagado" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" step="0.01" required>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Banco</label>
-                    <select name="banco" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
-                        {% for banco in bancos %}
-                        <option value="{{ banco.id }}">{{ banco.nombre }}</option>
-                        {% endfor %}
+                <!-- Nuevo campo: Medio de Pago -->
+                <div class="col-span-2">
+                    <label class="block text-sm font-medium text-gray-700">Medio de Pago</label>
+                    <select id="medio_pago-{{ data.id }}" name="medio_pago" onchange="toggleExtraFields({{ data.id }})" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="deposito">Depósito en cuenta</option>
+                        <option value="transferencia">Transferencia</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Código de Operación</label>
-                    <input type="text" name="codigo_operacion" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
+                <!-- Contenedor de campos adicionales, oculto por defecto -->
+                <div id="extra-fields-{{ data.id }}" class="col-span-2 hidden">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Banco</label>
+                        <select name="banco" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                            {% for banco in bancos %}
+                            <option value="{{ banco.id }}">{{ banco.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mt-2">
+                        <label class="block text-sm font-medium text-gray-700">Código de Operación</label>
+                        <input type="text" name="codigo_operacion" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div class="mt-2">
+                        <label class="block text-sm font-medium text-gray-700">Fecha de Operación</label>
+                        <input type="date" name="fecha_operacion" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                    </div>
                 </div>
-                <div>
+                <div class="col-span-2">
                     <label class="block text-sm font-medium text-gray-700">Fecha de Pago</label>
                     <input type="date" name="fecha_pago" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Fecha de Operación</label>
-                    <input type="date" name="fecha_operacion" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" required>
                 </div>
                 <!-- Nuevo campo: Nota / Observación -->
                 <div class="col-span-2">
@@ -139,7 +164,18 @@
 {% endfor %}
 
 
-
+<script>
+function toggleExtraFields(prestamoId) {
+    var select = document.getElementById('medio_pago-' + prestamoId);
+    var extraFields = document.getElementById('extra-fields-' + prestamoId);
+    // Si el medio de pago es efectivo, ocultar campos adicionales; en caso contrario, mostrarlos
+    if (select.value === 'efectivo') {
+        extraFields.classList.add('hidden');
+    } else {
+        extraFields.classList.remove('hidden');
+    }
+}
+</script>
 <!-- Script para controlar la visibilidad del modal -->
 <script>
     document.querySelectorAll('.open-modal').forEach(button => {
@@ -153,6 +189,91 @@
             this.closest('.fixed').classList.add('hidden');
         });
     });
+
+function verPagos(prestamoId) {
+    fetch(`/ver_pagos/${prestamoId}/`)
+        .then(response => response.json())
+        .then(data => {
+            let pagosContainer = document.getElementById("pagos-container");
+            let pagosBody = document.getElementById("pagos-body");
+            let totalPagado = 0;
+            pagosBody.innerHTML = "";
+
+            let html = "";
+
+            if (data.pagos && data.pagos.length > 0) {
+                html += '<div class="bg-white shadow-lg rounded-lg p-6 mb-6 animate-fade-in">';
+                html += '  <div class="flex justify-between items-center mb-4 border-b pb-2">';
+                html += '    <div class="flex items-center">';
+                html += '      <i class="fas fa-hand-holding-usd text-blue-600 text-2xl mr-2"></i>';
+                html += '      <h3 class="text-xl font-bold text-gray-800">Pagos Realizados (Préstamo #' + prestamoId + ')</h3>';
+                html += '    </div>';
+                html += '    <button onclick="finalizarCuota(' + prestamoId + ')" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:opacity-80 transition animate-fade-in">';
+                html += '      <i class="fas fa-check-circle"></i> Finalizar Cuota';
+                html += '    </button>';
+                html += '  </div>';
+                html += '  <ul class="divide-y divide-gray-300">';
+
+                data.pagos.forEach(function(pago) {
+                    totalPagado += pago.monto_pagado ? parseFloat(pago.monto_pagado) : 0;
+                    html += '    <li class="py-4 px-3 bg-gray-50 rounded-lg shadow-sm mb-3">';
+                    html += '      <div class="flex justify-between items-center">';
+                    html += '        <div>';
+                    html += '          <p class="text-gray-800 font-semibold">Cuota: ' + pago.cuota + '</p>';
+                    html += '          <p class="text-sm text-gray-500">Fecha: <span class="font-medium">' + (pago.fecha_pago || '-') + '</span></p>';
+                    html += '          <p class="text-sm text-gray-500">Notas: <span class="font-medium">' + (pago.notas || 'Sin notas') + '</span></p>';
+                    html += '        </div>';
+                    html += '        <div class="text-right">';
+                    html += '          <p class="text-lg font-bold text-green-600">S/ ' + (pago.monto_pagado ? parseFloat(pago.monto_pagado).toFixed(2) : '0.00') + '</p>';
+                    html += '        </div>';
+                    html += '      </div>';
+                    html += '    </li>';
+                });
+
+                html += '  </ul>';
+                html += '  <div class="mt-4 p-4 bg-gray-100 rounded-lg flex justify-between items-center">';
+                html += '    <p class="text-lg font-semibold text-gray-700">Total Pagado:</p>';
+                html += '    <p class="text-xl font-bold text-blue-700">S/ ' + totalPagado.toFixed(2) + '</p>';
+                html += '  </div>';
+                html += '</div>';
+            } else {
+                html = '<p class="text-gray-600 mt-4">No hay pagos registrados para esta cuota.</p>';
+            }
+
+            pagosBody.innerHTML = html;
+            pagosContainer.classList.remove("hidden");
+        })
+        .catch(error => console.error("Error obteniendo los pagos:", error));
+}
+
+function finalizarCuota(prestamoId) {
+    Swal.fire({
+        title: "¿Estás seguro?",
+        text: "Esta acción marcará la cuota como finalizada.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#28a745",
+        cancelButtonColor: "#d33",
+        confirmButtonText: "Sí, finalizar",
+        cancelButtonText: "Cancelar"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(`/finalizar_cuota/${prestamoId}/`, { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        Swal.fire("Éxito", "La cuota ha sido finalizada.", "success");
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        Swal.fire("Error", data.error || "No se pudo finalizar la cuota.", "error");
+                    }
+                })
+                .catch(error => Swal.fire("Error", "Hubo un problema al procesar la solicitud.", "error"));
+        }
+    });
+}
+
+
 </script>
 
 <!-- Inicializar DataTable -->
@@ -169,12 +290,13 @@ $(document).ready(function() {
             "infoEmpty": "No hay registros disponibles",
             "infoFiltered": "(filtrado de _MAX_ registros en total)",
             "search": "Buscar:",
-            "paginate": {
-                "first": "<button class='bg-gray-700 text-white px-4 py-2 rounded-l-md font-semibold'>Primero</button>",
-                "last": "<button class='bg-gray-700 text-white px-4 py-2 rounded-r-md font-semibold'>Último</button>",
-                "next": "<button class='bg-blue-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-blue-800'>Siguiente</button>",
-                "previous": "<button class='bg-blue-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-blue-800'>Anterior</button>"
-            }
+        "paginate": {
+            "first": "<button class='bg-gray-700 text-white px-2 py-1 rounded-l-md text-sm font-semibold'>Primero</button>",
+            "last": "<button class='bg-gray-700 text-white px-2 py-1 rounded-r-md text-sm font-semibold'>Último</button>",
+            "next": "<button class='bg-blue-600 text-white px-2 py-1 rounded-md text-sm font-semibold hover:bg-blue-800'>Siguiente</button>",
+            "previous": "<button class='bg-blue-600 text-white px-2 py-1 rounded-md text-sm font-semibold hover:bg-blue-800'>Anterior</button>"
+        }
+
         },
         ordering: true,
         order: [[0, 'desc']],
@@ -236,10 +358,11 @@ $(document).ready(function() {
             table.column(9).search('').draw(); // Restablece la columna 9 (Acción)
         } else if (estado === "proceso") {
             table.column(9).search('Pagar', true, false).draw(); // Filtra los que contienen "Pagar"
-        } else if (estado === "completado") {
+        } else if (estado === "terminado") {
             table.column(9).search('Completado', true, false).draw(); // Filtra los que contienen "Completado"
         }
     });
+
 });
 
 

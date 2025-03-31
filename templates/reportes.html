@@ -8,7 +8,7 @@
 <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <!-Hubo un error al generar el reporte- SweetAlert -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <div class="container mx-auto p-6 bg-white shadow rounded">
     <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">Generar Reportes-Concepto-Detallado</h1>
@@ -82,17 +82,20 @@
         </div>
     </form>
 </div>
+<div class="container mx-auto mt-6 p-6 flex flex-col md:flex-row gap-4">
+    <div class="w-full md:w-1/2">
 
 <!-- Sección de Reportes -->
-<div class="container mx-auto mt-6 p-6 bg-white shadow rounded">
+        <div class="bg-white shadow rounded p-6">
     <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">Generar Reportes-Concepto-Anual/Mensual</h2>
 
     <div class="flex flex-col sm:flex-row justify-center gap-4">
         <!-- Reporte Anual -->
         <a id="reporteAnual"
            href="{% url 'reporte_anual' %}"
-           class="px-6 py-3 bg-green-600 text-white font-medium rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-300">
-            Reporte Anual
+           class="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-300">
+            <i class="fas fa-file-excel"></i>
+            <span>Anual</span>
         </a>
 
         <!-- Reporte Mensual (Formulario POST con rango de meses) -->
@@ -134,83 +137,196 @@
                     <option value="12">Diciembre</option>
                 </select>
             </div>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white font-medium rounded-md shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-300">
-                Reporte Mensual
-            </button>
+        <button type="submit" class="inline-flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-md shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-300">
+            <i class="fas fa-file-excel"></i>
+            <span>Mensual</span>
+        </button>
         </form>
     </div>
 </div>
-
-
-<div class="container mx-auto mt-6 p-6 bg-white shadow rounded">
-    <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">Generar Reporte de Proveedores</h2>
-    <div class="flex flex-col sm:flex-row justify-center gap-4">
-        <select id="proveedor" name="proveedor" class="w-64 border-gray-300 rounded-md p-2 ">
-            <option value="">Seleccione un Proveedor</option>
-            {% for proveedor in proveedores %}
-                <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
-            {% endfor %}
-        </select>
-        <a id="btnReporteProveedorPDF" href="#" class="px-6 py-3 bg-red-600 text-white font-medium rounded-md shadow">
-            Gastos del Mes (PDF)
-        </a>
-        <a id="btnReporteProveedorExcel" href="#" class="px-6 py-3 bg-green-600 text-white font-medium rounded-md shadow">
-            Gastos del Mes (Excel)
-        </a>
+</div>
+    <div class="w-full md:w-1/2">
+        <div class="bg-white shadow rounded p-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">Generar Reporte Diario Conceptos</h2>
+            <form id="formReporteDiario" method="post" action="{% url 'reporte_diario_conceptos' %}" class="flex flex-col sm:flex-row items-center gap-4">
+                {% csrf_token %}
+                <div class="flex items-center gap-2">
+                    <label for="fecha_inicio" class="text-sm font-medium text-gray-700">Fecha Inicio:</label>
+                    <input type="date" id="fecha_inicio" name="fecha_inicio" required class="border-gray-300 rounded-md p-2" />
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="fecha_fin" class="text-sm font-medium text-gray-700">Fecha Fin:</label>
+                    <input type="date" id="fecha_fin" name="fecha_fin" required class="border-gray-300 rounded-md p-2" />
+                </div>
+                <button type="submit" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-md shadow hover:bg-blue-700">
+                    <i class="fas fa-file-excel"></i>
+                    <span>Diario</span>
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 
-<div class="container mx-auto mt-6 p-6 bg-white shadow rounded">
-    <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">Generar Reporte por Concepto/Proveedor</h2>
-    <form id="formReporteConceptoProveedor" method="post" action="{% url 'reporte_concepto_proveedor_pdf' %}" class="space-y-6">
+
+
+<div class="container mx-auto p-6">
+  <div class="flex flex-col md:flex-row gap-6">
+    <!-- Primera columna: Reporte por Concepto/Proveedor -->
+    <div class="w-full md:w-1/2 bg-white shadow rounded p-6">
+      <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">
+        Generar Reporte por Concepto/Proveedor
+      </h2>
+      <form id="formReporteConceptoProveedor" method="post" action="{% url 'reporte_concepto_proveedor_pdf' %}" class="space-y-6">
         {% csrf_token %}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <!-- Proveedor -->
-            <div class="flex flex-col">
-                <label for="proveedor" class="block text-sm font-medium text-gray-700 mb-2">Proveedor:</label>
-                <select id="proveedor_prove" name="proveedor" class="w-full border-gray-300 rounded-md p-2">
-                    <option value="">Seleccione un Proveedor</option>
-                    {% for proveedor in proveedores %}
-                        <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+          <!-- Proveedor -->
+          <div class="flex flex-col">
+            <label for="proveedor_prove" class="block text-sm font-medium text-gray-700 mb-2">
+              Proveedor:
+            </label>
+            <select id="proveedor_prove" name="proveedor" class="w-full border-gray-300 rounded-md p-2">
+              <option value="">Seleccione un Proveedor</option>
+              {% for proveedor in proveedores %}
+                <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+              {% endfor %}
+            </select>
+          </div>
 
-            <!-- Concepto Nivel 1 -->
-            <div class="flex flex-col">
-                <label for="concepto_nivel_1_prove" class="block text-sm font-medium text-gray-700 mb-2">Concepto Nivel 1:</label>
-                <select id="concepto_nivel_1_prove" name="concepto_nivel_1" class="w-full border-gray-300 rounded-md p-2">
-                    <option value="todos">Todos los Conceptos Nivel 1</option>
-                    {% for concepto in conceptos_nivel_1 %}
-                        <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+          <!-- Concepto Nivel 1 -->
+          <div class="flex flex-col">
+            <label for="concepto_nivel_1_prove" class="block text-sm font-medium text-gray-700 mb-2">
+              Concepto Nivel 1:
+            </label>
+            <select id="concepto_nivel_1_prove" name="concepto_nivel_1" class="w-full border-gray-300 rounded-md p-2">
+              <option value="todos">Todos los Conceptos Nivel 1</option>
+              {% for concepto in conceptos_nivel_1 %}
+                <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
 
-            <!-- Mes de Inicio -->
-            <div class="flex flex-col">
-                <label for="fecha_inicio" class="block text-sm font-medium text-gray-700 mb-2">Mes de Inicio:</label>
-                <input type="month" id="fecha_inicio" name="fecha_inicio" class="w-full border-gray-300 rounded-md p-2" />
-            </div>
+          <!-- Mes de Inicio -->
+          <div class="flex flex-col">
+            <label for="fecha_inicio" class="block text-sm font-medium text-gray-700 mb-2">
+              Mes de Inicio:
+            </label>
+            <input type="month" id="fecha_inicio" name="fecha_inicio" class="w-full border-gray-300 rounded-md p-2" />
+          </div>
 
-            <!-- Mes Final -->
-            <div class="flex flex-col">
-                <label for="fecha_final" class="block text-sm font-medium text-gray-700 mb-2">Mes Final:</label>
-                <input type="month" id="fecha_final" name="fecha_final" class="w-full border-gray-300 rounded-md p-2" />
-            </div>
+          <!-- Mes Final -->
+          <div class="flex flex-col">
+            <label for="fecha_final" class="block text-sm font-medium text-gray-700 mb-2">
+              Mes Final:
+            </label>
+            <input type="month" id="fecha_final" name="fecha_final" class="w-full border-gray-300 rounded-md p-2" />
+          </div>
         </div>
 
         <!-- Botón para generar el reporte -->
         <div class="flex justify-center mt-4">
-            <button type="submit" class="px-6 py-3 bg-blue-600 text-white font-medium rounded-md shadow hover:bg-blue-700">
-                Generar Reporte
-            </button>
+          <button type="submit" class="px-6 py-3 bg-blue-600 text-white font-medium rounded-md shadow hover:bg-blue-700 transition">
+            Generar Reporte
+          </button>
         </div>
-    </form>
+      </form>
+    </div>
+
+<div class="w-full md:w-1/2 bg-white shadow rounded p-6 flex flex-col justify-between">
+  <h2 class="text-xl font-bold mb-4 text-gray-800 text-center">
+    Generar Reporte de Proveedores/Mensual
+  </h2>
+  <div class="flex flex-col sm:flex-row items-center justify-center gap-4 flex-1">
+    <select id="proveedor" name="proveedor" class="w-64 border-gray-300 rounded-md p-2">
+      <option value="">Seleccione un Proveedor</option>
+      {% for proveedor in proveedores %}
+        <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+      {% endfor %}
+    </select>
+    <a id="btnReporteProveedorPDF" href="#" class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-medium rounded-md shadow hover:bg-red-700 transition">
+      <i class="fas fa-file-pdf"></i>
+      <span>PDF</span>
+    </a>
+    <a id="btnReporteProveedorExcel" href="#" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-medium rounded-md shadow hover:bg-green-700 transition">
+      <i class="fas fa-file-excel"></i>
+      <span>Excel</span>
+    </a>
+  </div>
 </div>
 
 
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script src="{% static 'js/reporteexcel.js' %}" ></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        document.getElementById("formReporteDiario").addEventListener("submit", function(event) {
+            event.preventDefault();  // Evita el envío automático del formulario
+
+            let form = event.target;  // Obtiene el formulario actual
+            let fechaInicio = form.querySelector("input[name='fecha_inicio']").value;
+            let fechaFin = form.querySelector("input[name='fecha_fin']").value;
+
+            // Validar que las fechas no estén vacías
+            if (!fechaInicio || !fechaFin) {
+                Swal.fire({
+                    icon: "warning",
+                    title: "Fechas requeridas",
+                    text: "Debes seleccionar una fecha de inicio y una fecha de fin."
+                });
+                return;
+            }
+
+            // Mostrar alerta de carga
+            Swal.fire({
+                title: "Generando reporte...",
+                text: "Por favor, espera mientras generamos tu archivo.",
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();  // Muestra el spinner de carga
+                }
+            });
+
+            // Enviar el formulario manualmente con fetch
+            let formData = new FormData(form);
+
+            fetch(form.action, {
+                method: form.method,
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Error al generar el reporte");
+                }
+                return response.blob();  // Convertir la respuesta en un archivo
+            })
+            .then(blob => {
+                let url = window.URL.createObjectURL(blob);
+                let a = document.createElement("a");
+                a.href = url;
+                a.download = `Reporte_Diario_${fechaInicio}_${fechaFin}.xlsx`; // Asigna el nombre del archivo
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                // Cerrar el SweetAlert después de la descarga
+                setTimeout(() => {
+                    Swal.close();
+                }, 1000); // Espera 1 segundo antes de cerrar
+            })
+            .catch(error => {
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: "Hubo un problema al generar el reporte. Intenta de nuevo."
+                });
+            });
+        });
+    });
+</script>
 <script>
 
 $(document).ready(function() {

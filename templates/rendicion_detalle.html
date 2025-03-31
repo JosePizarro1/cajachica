@@ -1,0 +1,24 @@
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for rendicion in gasto.rendiciones_gasto.all %}
+    <div class="bg-white p-4 rounded-lg shadow-md">
+        <h3 class="text-xl font-semibold mb-4 text-blue-600">
+            Rendición #{{ rendicion.numero_requerimiento }}
+        </h3>
+        
+        <div class="grid grid-cols-2 gap-4 text-sm">
+            <div class="space-y-2">
+                <p><span class="font-medium">Fecha Operación:</span> {{ rendicion.fecha_operacion|date:"d/m/Y" }}</p>
+                <p><span class="font-medium">Importe:</span> S/ {{ rendicion.importe }}</p>
+                <p><span class="font-medium">Tipo Comprobante:</span> {{ rendicion.tipo_comprobante }}</p>
+            </div>
+            <div class="space-y-2">
+                <p><span class="font-medium">Concepto:</span> 
+                    {{ rendicion.concepto_nivel_3.nombre|default:rendicion.concepto_nivel_2.nombre|default:rendicion.concepto_nivel_1.nombre }}
+                </p>
+                <p><span class="font-medium">Descripción:</span> {{ rendicion.descripcion }}</p>
+                <p><span class="font-medium">Registrado por:</span> {{ rendicion.usuario_creador.username }}</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>

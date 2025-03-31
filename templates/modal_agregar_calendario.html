@@ -1,0 +1,243 @@
+<!-- Modal para Agregar Evento -->
+<div id="eventModal" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center hidden">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+    <!-- Header con gradiente -->
+    <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-t-xl p-4">
+      <div class="flex justify-between items-center">
+        <h5 class="text-xl font-semibold text-white">Agregar Evento</h5>
+        <button id="closeModal" class="text-white hover:text-blue-100 transition-colors">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Contenido del formulario -->
+    <form id="eventForm" class="p-6 space-y-4">
+      <!-- Título -->
+      <div>
+        <label for="eventTitle" class="block text-sm font-medium text-gray-700 mb-1">Título del Evento</label>
+        <input type="text" id="eventTitle" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-500 transition-all" placeholder="Ej: Pago de alquiler" required>
+      </div>
+
+      <!-- Fechas -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="eventStart" class="block text-sm font-medium text-gray-700 mb-1">Fecha Inicio</label>
+          <input type="date" id="eventStart" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 transition-all" required>
+        </div>
+        <div>
+          <label for="eventEnd" class="block text-sm font-medium text-gray-700 mb-1">Fecha Fin</label>
+          <input type="date" id="eventEnd" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 transition-all">
+        </div>
+      </div>
+
+      <!-- Repetición y Monto -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label for="eventRepeat" class="block text-sm font-medium text-gray-700 mb-1">Repetición</label>
+          <select id="eventRepeat" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 transition-all">
+            <option value="none">No se repite</option>
+            <option value="daily">Diario</option>
+            <option value="weekly">Semanal</option>
+            <option value="monthly">Mensual</option>
+          </select>
+        </div>
+        <div id="repeatUntilContainer" class="hidden">
+          <label for="repeatUntil" class="block text-sm font-medium text-gray-700 mb-1">Repetir hasta</label>
+          <input type="date" id="repeatUntil" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 transition-all">
+        </div>
+        <div>
+          <label for="eventAmount" class="block text-sm font-medium text-gray-700 mb-1">Monto (S/)</label>
+          <input type="number" id="eventAmount" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 transition-all" placeholder="0.00" min="0" step="0.01">
+        </div>
+      </div>
+
+      <!-- Observaciones -->
+      <div>
+        <label for="eventNotes" class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+        <textarea id="eventNotes" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-200 transition-all" rows="3" placeholder="Detalles adicionales..."></textarea>
+      </div>
+
+      <!-- Toggle Préstamo -->
+      <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+        <span class="text-sm font-medium text-gray-700">¿Es un préstamo?</span>
+        <label for="prestamoToggle" class="inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="prestamoToggle" class="sr-only peer">
+          <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          <span class="ml-3 text-sm font-medium text-gray-700">No/Sí</span>
+        </label>
+      </div>
+    </form>
+
+    <!-- Footer con botones -->
+    <div class="bg-gray-50 px-6 py-4 rounded-b-xl flex justify-end space-x-3">
+      <button id="closeModalBtn" class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 transition-all">
+        Cancelar
+      </button>
+      <button id="saveEvent" class="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all flex items-center">
+        <i class="fas fa-save mr-2"></i> Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+  
+  
+<script>
+$(document).ready(function() {
+    function getCookie(name) {
+    var cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      var cookies = document.cookie.split(';');
+      for (var i = 0; i < cookies.length; i++) {
+        var cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  var csrftoken = getCookie('csrftoken');
+    // Configuración global de AJAX para enviar el token CSRF en las peticiones no seguras
+    $.ajaxSetup({
+    beforeSend: function(xhr, settings) {
+      if (!(/^GET|HEAD|OPTIONS|TRACE$/i.test(settings.type)) && !this.crossDomain) {
+        xhr.setRequestHeader("X-CSRFToken", csrftoken);
+      }
+    }
+  });
+
+
+  // Si se selecciona "Diario", mostrar el campo "Repetir hasta" y deshabilitar "Fin"
+  $('#eventRepeat').on('change', function() {
+    var repeatVal = $(this).val();
+    if (repeatVal !== 'none') {
+      $('#repeatUntilContainer').removeClass('hidden');
+      $('#eventEnd').prop('disabled', true).val('');
+    } else {
+      $('#repeatUntilContainer').addClass('hidden');
+      $('#eventEnd').prop('disabled', false);
+    }
+  });
+  
+  // Abrir modal Agregar Evento con transición suave
+  $('[data-modal-target="eventModal"]').on('click', function() {
+    $('#eventModal').removeClass('hidden').hide().fadeIn(600);
+});
+
+  // Cerrar modal Agregar Evento con transición suave
+  $('#closeModal, #closeModalBtn').on('click', function() {
+    $('#eventModal').fadeOut(600, function() {
+      $(this).addClass('hidden').css('display', '');
+    });
+  });
+
+  let guardando = false;
+
+
+// Guardar evento desde el modal vía AJAX con SweetAlert2 y RRule
+$('#saveEvent').on('click', function() {
+  if(guardando) return;
+  var titulo       = $('#eventTitle').val();
+  var fecha_inicio = $('#eventStart').val();
+  // Si "Fin" está deshabilitado o vacío, usar la fecha de inicio
+  var fecha_fin    = ($('#eventEnd').prop('disabled') || !$('#eventEnd').val()) ? fecha_inicio : $('#eventEnd').val();
+  var recurrencia  = $('#eventRepeat').val();  // 'none', 'daily', 'weekly' o 'monthly'
+  var monto        = $('#eventAmount').val();
+  var notas        = $('#eventNotes').val();
+  var repeatUntil  = $('#repeatUntil').val();
+  var prestamo     = $('#prestamoToggle').is(':checked');
+
+  if (!titulo || !fecha_inicio) return;
+
+  // Preparar datos para enviar, usando los nombres de campo del modelo
+  var data = {
+    titulo: titulo,
+    fecha_inicio: fecha_inicio,
+    fecha_fin: fecha_fin,
+    recurrencia: recurrencia,
+    monto: monto,
+    notas: notas,
+    prestamo: prestamo,
+    repeatUntil: repeatUntil,
+  };
+
+  // Si se define una recurrencia, agregar la propiedad rrule
+  if (recurrencia !== 'none') {
+    // Definir la fecha límite para la recurrencia: se usa "repeatUntil" si existe, de lo contrario se usa fecha_fin
+    var untilDate = repeatUntil || fecha_fin;
+    if (recurrencia === 'daily') {
+      data.rrule = {
+        freq: 'daily',
+        dtstart: fecha_inicio,
+        until: untilDate
+      };
+    } else if (recurrencia === 'weekly') {
+      data.rrule = {
+        freq: 'weekly',
+        dtstart: fecha_inicio,
+        until: untilDate
+      };
+    } else if (recurrencia === 'monthly') {
+      data.rrule = {
+        freq: 'monthly',
+        dtstart: fecha_inicio,
+        until: untilDate,
+        bymonthday: -1   // Usa el último día del mes en meses que no tengan el día de fecha_inicio
+      };
+    }
+  }
+  // Deshabilitar botón y mostrar carga
+  guardando = true;
+  $('#saveEvent').prop('disabled', true).html('<span class="loader"></span> Guardando...');
+
+  $.ajax({
+    url: '/crear-evento/',
+    method: 'POST',
+    contentType: 'application/json',
+    data: JSON.stringify(data),
+    success: function(response) {
+      if (response.success) {
+        Swal.fire({
+          title: '¡Éxito!',
+          text: 'El evento se ha guardado correctamente.',
+          icon: 'success',
+          confirmButtonText: 'Aceptar'
+        }).then(function(){
+          actualizarEventos();  // Actualiza todos los eventos
+          $('#eventForm')[0].reset();
+          $('#eventEnd').prop('disabled', false);
+          $('#repeatUntilContainer').addClass('hidden');
+          $('#eventModal').addClass('hidden');
+        });
+      } else {
+        Swal.fire({
+          title: 'Error!',
+          text: response.error,
+          icon: 'error',
+          confirmButtonText: 'Aceptar'
+        });
+      }
+    },
+    error: function(xhr, status, error) {
+      Swal.fire({
+        title: 'Error!',
+        text: 'Error al guardar el evento.',
+        icon: 'error',
+        confirmButtonText: 'Aceptar'
+      });
+    },
+    complete: function() {
+                // Reactivar botón y quitar spinner
+                guardando = false;
+                $('#saveEvent').prop('disabled', false).html('Guardar');
+            }
+  });
+});
+
+
+
+});
+</script>

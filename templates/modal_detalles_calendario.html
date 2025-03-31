@@ -1,0 +1,408 @@
+<style>
+  .animate-modal-in {
+    animation: modalFadeIn 0.3s ease-out forwards;
+  }
+  @keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  
+  .animate-button-hover {
+    transition: all 0.2s ease;
+  }
+  .animate-button-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+</style>
+
+<div id="eventDetailsModal" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center hidden">
+  <div id="eventDetailsContent" class="bg-white rounded-lg shadow-2xl w-full max-w-2xl mx-4 animate-modal-in overflow-hidden">
+    <!-- Cabecera con nuevo diseño -->
+    <div class="bg-gradient-to-r from-blue-500 to-blue-600 p-6">
+      <div class="flex justify-between items-center">
+        <h2 id="detailTitleHeader" class="text-2xl md:text-3xl font-bold text-white"></h2>
+        <div class="flex items-center gap-3">
+
+          <button id="closeDetailsModal" class="text-white hover:text-gray-200 transition-colors duration-200">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenido principal con scroll -->
+    <div class="p-6 max-h-[60vh] overflow-y-auto">
+      <div id="eventDetails" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <!-- Contenedor de fecha con edición -->
+        <div class="flex items-center bg-blue-50 rounded-lg p-4">
+          <i class="fas fa-calendar-alt text-blue-500 mt-1 mr-3 text-lg"></i>
+          <div>
+            <p class="font-semibold text-gray-700">Fecha del evento</p>
+            <p id="detailStart" class="text-gray-600"></p>
+            <input type="date" id="editDetailStart" class="hidden border rounded p-1 mt-1" />
+          </div>
+
+          <!-- Botón de edición -->
+          <button id="editEventDetails" class="ml-3 text-blue-500 hover:text-blue-700 transition">
+            <i class="fas fa-edit"></i>
+          </button>
+
+          <!-- Botón de guardar (oculto por defecto) -->
+          <button id="saveEditedDetails" class="ml-2 text-green-500 hover:text-green-700 hidden transition">
+            <i class="fas fa-save"></i>
+          </button>
+        </div>
+        
+
+        <!-- Recurrencia -->
+        <div class="flex items-start bg-purple-50 rounded-lg p-4">
+          <i class="fas fa-sync-alt text-purple-500 mt-1 mr-3 text-lg"></i>
+          <div>
+            <p class="font-semibold text-gray-700">Recurrencia</p>
+            <p id="detailRepeat" class="text-gray-600"></p>
+          </div>
+        </div>
+
+        <!-- Monto -->
+        <div class="flex items-start bg-green-50 rounded-lg p-4">
+          <i class="fas fa-dollar-sign text-green-500 mt-1 mr-3 text-lg"></i>
+          <div>
+            <p class="font-semibold text-gray-700">Monto</p>
+            <p id="detailAmount" class="text-gray-600"></p>
+          </div>
+        </div>
+
+        <!-- Préstamo -->
+        <div class="flex items-start bg-amber-50 rounded-lg p-4">
+          <i class="fas fa-hand-holding-usd text-amber-500 mt-1 mr-3 text-lg"></i>
+          <div>
+            <p class="font-semibold text-gray-700">Préstamo</p>
+            <p id="detailPrestamo" class="text-gray-600"></p>
+          </div>
+        </div>
+
+        <!-- Observaciones (full width) -->
+        <div class="md:col-span-2 flex items-start bg-gray-50 rounded-lg p-4">
+          <i class="fas fa-sticky-note text-gray-500 mt-1 mr-3 text-lg"></i>
+          <div>
+            <p class="font-semibold text-gray-700">Observaciones</p>
+            <p id="detailNotes" class="text-gray-600"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botones de acción mejorados -->
+    <div class="bg-gray-50 px-6 py-4 border-t flex flex-col sm:flex-row justify-end gap-3">
+      <button id="marcarEvento" class="animate-button-hover flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg focus:outline-none transition-all">
+        <i class="fas fa-check"></i>
+        <span>Marcar como Pagado</span>
+      </button>
+      
+      <button id="payEvent" class="animate-button-hover flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg focus:outline-none transition-all">
+        <i class="fas fa-money-bill-wave"></i>
+        <span>Realizar Pago</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+  {% include "modalPagarPrestamo.html" %}
+  {% include "modalPagarGasto.html" %}
+
+
+
+
+
+  <!-- <button id="deleteAllEvent" class="flex items-center gap-2 bg-red-700 hover:bg-red-800 text-white py-2 px-4 rounded focus:outline-none">
+    <i class="fas fa-trash-alt"></i> Eliminar Todo
+    </button>
+    <button id="deleteEvent" class="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded focus:outline-none">
+       <i class="fas fa-trash-alt"></i> Eliminar Evento 
+      </button> 
+      
+      -->
+
+  <script>
+      // LOGICA PARA EDITAR FECHA DEL MODAL DETALLE
+      let originalDate = "";  // Guardar la fecha original
+
+document.getElementById("editEventDetails").addEventListener("click", function() {
+    let dateText = document.getElementById("detailStart").textContent.trim();
+
+    if (!originalDate) {
+        originalDate = dateText;
+    }
+
+    // Mostrar input y ocultar texto
+    document.getElementById("editDetailStart").classList.remove("hidden");
+    document.getElementById("detailStart").classList.add("hidden");
+
+    // Asignar la fecha actual al input
+    document.getElementById("editDetailStart").value = dateText;
+
+    // Mostrar botón de guardar
+    document.getElementById("saveEditedDetails").classList.remove("hidden");
+});
+
+// Al cerrar el modal, restaurar la fecha original y ocultar el botón de guardar
+document.getElementById("closeDetailsModal").addEventListener("click", function() {
+    document.getElementById("detailStart").textContent = originalDate;
+    document.getElementById("editDetailStart").classList.add("hidden");
+    document.getElementById("detailStart").classList.remove("hidden");
+    document.getElementById("saveEditedDetails").classList.add("hidden");
+    originalDate = "";
+});
+
+// Guardar cambios con confirmación de SweetAlert
+document.getElementById("saveEditedDetails").addEventListener("click", function() {
+    let newDate = document.getElementById("editDetailStart").value;
+    let eventId = window.currentEventId;  // ID del evento actual
+
+    if (newDate) {
+        Swal.fire({
+            title: "¿Guardar cambios?",
+            text: "¿Estás seguro de actualizar la fecha del evento?",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#28a745",
+            cancelButtonColor: "#d33",
+            confirmButtonText: "Sí, guardar",
+            cancelButtonText: "Cancelar"
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Enviar datos al backend
+                $.ajax({
+                    type: "POST",
+                    url: "/actualizar_evento/",  // URL del backend
+                    data: JSON.stringify({ id: eventId, fecha: newDate }),
+                    contentType: "application/json",
+                    success: function(response) {
+                        Swal.fire({
+                            icon: "success",
+                            title: "Guardado",
+                            text: "La fecha se actualizó correctamente."
+                        }).then(() => {
+                            document.getElementById("detailStart").textContent = newDate;
+                            originalDate = newDate;
+                            actualizarEventos(); // 🔹 Se ejecuta después del éxito
+                        });
+                    },
+                    error: function() {
+                        Swal.fire("Error", "Hubo un problema al actualizar la fecha.", "error");
+                    }
+                });
+                // Ocultar input y botón de guardar
+                document.getElementById("editDetailStart").classList.add("hidden");
+                document.getElementById("detailStart").classList.remove("hidden");
+                document.getElementById("saveEditedDetails").classList.add("hidden");
+            }
+        });
+    }
+});
+
+  </script>
+  <script>
+    $('#payEvent').on('click', function() {
+    if (window.currentEventPrestamo) {
+        $('#modalPagarPrestamo').removeClass('hidden').hide().fadeIn(300);
+    } else {
+        $('#modalPagarGasto').removeClass('hidden').hide().fadeIn(300);
+    }
+    });
+
+    $('#cerrarPrestamo').on('click', function() {
+        $('#modalPagarPrestamo').fadeOut(300, function() { $(this).addClass('hidden'); });
+    });
+
+    $('#cerrarGasto').on('click', function() {
+        $('#modalPagarGasto').fadeOut(300, function() { $(this).addClass('hidden'); });
+    });
+
+
+
+    // Manejo de la eliminación del evento con SweetAlert2 y AJAX
+$('#deleteAllEvent').on('click', function() {
+  console.log("Botón de eliminar evento presionado.");
+  console.log("ID del evento a eliminar:", window.currentEventId);
+
+  Swal.fire({
+    title: '¿Estás seguro?',
+    text: "¡Esta acción no se podrá deshacer!",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Sí, eliminarlo!'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      $.ajax({
+        url: '/eliminar-evento/',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ id: window.currentEventMasterId }),
+        success: function(response) {
+          if (response.success) {
+            Swal.fire({
+              title: 'Eliminado!',
+              text: response.message,
+              icon: 'success',
+              confirmButtonText: 'Aceptar'
+            }).then(function() {
+              actualizarEventos(); // Función que actualiza los eventos del calendario
+              // Cierra el modal de detalles con fadeOut
+              $('#eventDetailsModal').fadeOut(600, function() {
+                $(this).addClass('hidden').css('display', '');
+                $('#eventDetailsContent').removeClass('scale-100').addClass('scale-90');
+              });
+            });
+          } else {
+            Swal.fire({
+              title: 'Error!',
+              text: response.error,
+              icon: 'error',
+              confirmButtonText: 'Aceptar'
+            });
+          }
+        },
+        error: function(xhr, status, error) {
+          Swal.fire({
+            title: 'Error!',
+            text: 'Error al eliminar el evento.',
+            icon: 'error',
+            confirmButtonText: 'Aceptar'
+          });
+        }
+      });
+    }
+  });
+});
+
+
+
+
+
+$('#deleteEvent').on('click', function() {
+  console.log("ID de la ocurrencia a eliminar:", window.currentEventId);
+  if (!window.currentEventId) {
+    Swal.fire({
+      title: 'Error!',
+      text: 'No se ha seleccionado una ocurrencia válida.',
+      icon: 'error',
+      confirmButtonText: 'Aceptar'
+    });
+    return;
+  }
+  Swal.fire({
+    title: '¿Estás seguro?',
+    text: "¡Esta acción eliminará la ocurrencia seleccionada y no se podrá deshacer!",
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Sí, eliminarla!'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      $.ajax({
+        url: '/eliminar-ocurrencia-evento/',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ id: window.currentEventId }),
+        success: function(response) {
+          if (response.success) {
+            Swal.fire({
+              title: 'Eliminada!',
+              text: response.message,
+              icon: 'success',
+              confirmButtonText: 'Aceptar'
+            }).then(function() {
+              actualizarEventos(); // Refresca el calendario
+              $('#eventDetailsModal').fadeOut(600, function() {
+                $(this).addClass('hidden').css('display', '');
+                $('#eventDetailsContent').removeClass('scale-100').addClass('scale-90');
+              });
+            });
+          } else {
+            Swal.fire({
+              title: 'Error!',
+              text: response.error,
+              icon: 'error',
+              confirmButtonText: 'Aceptar'
+            });
+          }
+        },
+        error: function(xhr, status, error) {
+          Swal.fire({
+            title: 'Error!',
+            text: 'Error al eliminar la ocurrencia del evento.',
+            icon: 'error',
+            confirmButtonText: 'Aceptar'
+          });
+        }
+      });
+    }
+  });
+});
+
+
+
+
+
+$('#marcarEvento').on('click', function() {
+  Swal.fire({
+    title: '¿Estás seguro?',
+    text: 'Marcarás este evento como pagado.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#28a745',
+    cancelButtonColor: '#d33',
+    confirmButtonText: 'Sí, pagar!',
+    cancelButtonText: 'Cancelar'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      $.ajax({
+        url: '/pagar-evento/',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ id: window.currentEventId }),
+        success: function(response) {
+          if (response.success) {
+            Swal.fire({
+              title: 'Pagado!',
+              text: response.message,
+              icon: 'success',
+              confirmButtonText: 'Aceptar'
+            }).then(function() {
+              actualizarEventos(); // Función para recargar el calendario
+              $('#eventDetailsModal').fadeOut(600, function() {
+                $(this).addClass('hidden').css('display', '');
+              });
+            });
+          } else {
+            Swal.fire({
+              title: 'Error!',
+              text: response.error,
+              icon: 'error',
+              confirmButtonText: 'Aceptar'
+            });
+          }
+        },
+        error: function(xhr, status, error) {
+          Swal.fire({
+            title: 'Error!',
+            text: 'No se pudo marcar como pagado.',
+            icon: 'error',
+            confirmButtonText: 'Aceptar'
+          });
+        }
+      });
+    }
+  });
+});
+
+
+  </script>
+
+
+

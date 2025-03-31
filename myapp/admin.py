@@ -1,5 +1,27 @@
 from django.contrib import admin
-from .models import Fondo, Local, Concepto, CajaChica, Rendicion, Gasto, Ingreso,Proveedor,CuentaBancaria,Banco,Prestamo,SaldoInicial,Pago,Personal
+from .models import Fondo, Local, Concepto, CajaChica, Rendicion, Gasto, Ingreso,Proveedor,CuentaBancaria,Banco,Prestamo,SaldoInicial,Pago,Personal,Evento,OcurrenciaEvento
+
+class OcurrenciaEventoInline(admin.TabularInline):
+    model = OcurrenciaEvento
+    extra = 0
+    date_hierarchy = 'fecha'
+
+@admin.register(Evento)
+class EventoAdmin(admin.ModelAdmin):
+    list_display = ('titulo', 'fecha_inicio', 'fecha_fin', 'recurrencia', 'monto', 'creado_por', 'prestamo')
+    list_filter = ('recurrencia', 'fecha_inicio', 'creado_por')
+    search_fields = ('titulo', 'notas')
+    ordering = ('-fecha_inicio',)
+    inlines = [OcurrenciaEventoInline]
+
+@admin.register(OcurrenciaEvento)
+class OcurrenciaEventoAdmin(admin.ModelAdmin):
+    list_display = ('evento', 'fecha', 'pagado')
+    list_filter = ('pagado', 'fecha', 'evento')
+    search_fields = ('evento__titulo',)
+    ordering = ('fecha',)
+
+
 
 class PersonalAdmin(admin.ModelAdmin):
     list_display = ('dni','contraseña_creada', 'apellidos_nombres', 'celular', 'correo_personal', 'correo_corporativo')

@@ -52,7 +52,32 @@
       </a>
     </div>
 
-    <div class="overflow-x-auto">
+<div class="overflow-x-auto">
+      <!-- Contenedor de filtros y botón de generar PDF -->
+  <div class="mb-4 flex flex-wrap gap-4 items-center">
+    <select id="filterSede" class="border px-3 py-2 rounded-lg">
+      <option value="">Todas las Sedes</option>
+      {% for local in locales %}
+      <option value="{{ local.nombre_local }}">{{ local.nombre_local }}</option>
+      {% endfor %}
+    </select>
+
+    <select id="filterPlanilla" class="border px-3 py-2 rounded-lg">
+      <option value="">Todos</option>
+      <option value="Con planilla">Con planilla</option>
+      <option value="Sin planilla">Sin planilla</option>
+    </select>
+
+<a id="btnPDF" href="#" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 flex items-center gap-2">
+    <i class="fas fa-file-pdf"></i> PDF
+</a>
+<a id="btnExcel" href="#" class="bg-green-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 flex items-center gap-2">
+    <i class="fas fa-file-excel"></i> Excel (En Construcción)
+</a>
+
+
+  </div>
+
       <table id="personalTable" class="w-full border border-gray-200 rounded-lg text-sm">
 <thead class="bg-blue-600 text-white uppercase">
   <tr>
@@ -62,6 +87,7 @@
     <th class="py-2 px-3 text-left">Celular</th>
     <th class="py-2 px-3 text-left">Periodo Inicio</th>
     <th class="py-2 px-3 text-left">Periodo Fin</th>
+    <th class="py-2 px-3 text-center">Sede</th> <!-- Nueva columna -->
     <th class="py-2 px-3 text-center">Contrato</th> <!-- Nueva columna -->
     <th class="py-2 px-3 text-center">Acciones</th>
   </tr>
@@ -75,6 +101,16 @@
     <td class="py-2 px-3">{{ persona.celular }}</td>
     <td class="py-2 px-3">{{ persona.periodo_inicio|date:"d/m/Y"|default:"-" }}</td>
     <td class="py-2 px-3">{{ persona.periodo_fin|date:"d/m/Y"|default:"-" }}</td>
+        <!-- Nueva columna: Sede -->
+    <td class="py-2 px-3 text-center">
+      {% if persona.local.nombre_local == "Focus" %}
+        <span class="bg-red-300 text-black px-2 py-1 rounded-lg text-xs">{{ persona.local.nombre_local }}</span>
+      {% elif persona.local.nombre_local == "Sin Especificar" %}
+        <span class="bg-gray-400 text-white px-2 py-1 rounded-lg text-xs">{{ persona.local.nombre_local }}</span>
+      {% else %}
+        <span class="bg-[#255A9E] text-white px-2 py-1 rounded-lg text-xs">{{ persona.local.nombre_local }}</span>
+      {% endif %}
+    </td>
 
 <!-- Nueva columna: Contrato -->
 <td class="py-2 px-3 text-center">
@@ -96,7 +132,7 @@
 
 
 <td class="py-2 px-3 text-center flex justify-center gap-2">
-  {% if user.username != "naye123" %}
+  {% if user.username != "naye1234" %}
     <a href="{% url 'editar_personal' persona.id %}" class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-xs hover:bg-yellow-700 transition">
       <i class="fas fa-edit"></i>
     </a>
@@ -116,7 +152,21 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+document.getElementById("btnPDF").addEventListener("click", function(event) {
+    event.preventDefault();
+    let sede = document.getElementById("filterSede").value;
+    let planilla = document.getElementById("filterPlanilla").value;
 
+    let url = "{% url 'generar_pdf_personal' %}";
+    let params = new URLSearchParams();
+
+    if (sede) params.append("sede", sede);
+    if (planilla) params.append("planilla", planilla);
+
+    window.location.href = url + "?" + params.toString();
+});
+</script>
 <!-- Inicializar DataTables con configuración personalizada para Tailwind y ordenación por Periodo Fin descendente (más reciente primero) -->
 <script>
   $(document).ready(function() {
@@ -159,21 +209,7 @@
     });
   });
 
-  function crearContraseña(personalId) {
-    Swal.fire({
-      title: "¿Está seguro?",
-      text: "¿Desea generar una nueva contraseña para este usuario?",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#3085d6",
-      cancelButtonColor: "#d33",
-      confirmButtonText: "Sí, crear contraseña"
-    }).then((result) => {
-      if (result.isConfirmed) {
-        window.location.href = `/crear_contraseña/${personalId}/`;
-      }
-    });
-  }
+
 document.querySelectorAll('.generar-pdf').forEach(button => {
   button.addEventListener('click', function() {
     Swal.fire({

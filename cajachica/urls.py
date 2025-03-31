@@ -65,6 +65,27 @@ urlpatterns = [
     path('trigger-error/', trigger_error, name='trigger_error'),
     path('eliminar-item/<int:item_id>/<str:item_tipo>/', eliminar_item, name='eliminar_item'),
     path('reporte-concepto-proveedor-pdf/', reporte_concepto_proveedor_pdf, name='reporte_concepto_proveedor_pdf'),
+    path('generar-pdf-personal/', generar_pdf_personal, name='generar_pdf_personal'),
+    path('ver-rendidos/', ver_rendidos, name='ver_rendidos'),
+    path('gasto/<int:gasto_id>/rendiciones/', ver_rendiciones_asociadas, name='ver_rendiciones_asociadas'),
+    path('crear_pdf_rendicion/<int:gasto_id>/', crear_pdf_rendicion, name='crear_pdf_rendicion'),
+    path("generar-pdf-rendiciones/", generar_pdf_rendiciones, name="generar_pdf_rendiciones"),
+    path('ver_pagos/<int:prestamo_id>/', ver_pagos, name='ver_pagos'),
+    path('finalizar_cuota/<int:prestamo_id>/', finalizar_cuota, name='finalizar_cuota'),
+    path('reporte-diario-conceptos/', reporte_diario_conceptos, name='reporte_diario_conceptos'),
+
+        #Calendario
+    path('calendario/', ver_calendar, name='ver_calendar'),
+    path('crear-evento/', crear_evento, name='crear_evento'),
+    path('obtener-eventos/', obtener_eventos, name='obtener_eventos'),
+    path('eliminar-evento/', eliminar_evento, name='eliminar_evento'),
+    path('eliminar-ocurrencia-evento/', eliminar_ocurrencia_evento, name='eliminar_ocurrencia_evento'),
+    path('pagar-evento/', pagar_evento, name='pagar_evento'),
+    path('obtener-eventos-pagados/', obtener_eventos_pagados, name='obtener_eventos_pagados'),
+    path('actualizar_evento/', actualizar_evento, name='actualizar_evento'),
+    path('gasto_calendario/', gasto_calendario, name='gasto_calendario'),
+    path('obtener-total-mes/', obtener_total_mes, name='obtener_total_mes'),
+    path('generar_reporte_pdf_calendario/', generar_reporte_pdf_calendario, name='generar_reporte_pdf_calendario'),
 
 ]
 if settings.DEBUG:

@@ -19,11 +19,16 @@
     <div class="container mx-auto mt-8">
     <h1 class="text-3xl font-bold mb-6 text-center text-gray-700">Lista de Proveedores</h1>
 
-    <div class="mb-6 text-center">
-        <button id="addProveedor" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-6 rounded">
-            Agregar Proveedor
-        </button>
-    </div>
+<div class="mb-6 flex gap-4 justify-center">
+    <button id="addProveedor" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-6 rounded">
+        Agregar Proveedor
+    </button>
+    <button type="button" class="bg-green-600 hover:bg-green-700 text-white p-3 rounded-lg transition duration-300" onclick="openModal('agregarBancoModal')">
+        Agregar Banco
+    </button>
+</div>
+
+
 
     <div class="overflow-x-auto">
         <table id="proveedoresTable" class="min-w-full bg-white rounded-lg shadow-md">
@@ -240,7 +245,40 @@
     </div>
 </div>
 
+<!-- Modal para agregar banco -->
+<div id="agregarBancoModal" class="fixed inset-0 z-50 hidden bg-gray-800 bg-opacity-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen">
+        <!-- Contenido del Modal -->
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+            <h2 class="text-2xl font-bold mb-4 text-center">Agregar Banco</h2>
+            <!-- Formulario de agregar banco -->
+            <form method="POST" action="{% url 'agregar_banco' %}">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="id_nombre" class="block text-sm font-medium text-gray-700">Nombre del Banco</label>
+                    <input type="text" id="id_nombre" name="nombre" class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre del Banco" required>
+                </div>
 
+                <div class="flex justify-end space-x-4">
+                    <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600" onclick="closeModal('agregarBancoModal')">Cerrar</button>
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+  // Función para abrir el modal
+  function openModal(modalId) {
+      document.getElementById(modalId).classList.remove('hidden');
+  }
+
+  // Función para cerrar el modal
+  function closeModal(modalId) {
+      document.getElementById(modalId).classList.add('hidden');
+  }
+</script>
 
 
 <script>
