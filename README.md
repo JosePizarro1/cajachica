@@ -49,7 +49,7 @@ Sistema integral para la gestión del flujo de efectivo y control financiero des
 
 - **Backend:** Django 4.2
 - **Frontend:** HTML5, Bootstrap 5, Tailwind CSS
-- **Base de Datos:** PostgreSQL
+- **Base de Datos:** SqlLite3
 - **Despliegue:** PythonAnywhere
 - **Otros:** JavaScript, jQuery, Chart.js
 
