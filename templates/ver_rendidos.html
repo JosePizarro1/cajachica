@@ -52,6 +52,8 @@
         <th class="px-4 py-3 text-left">ID Gasto</th>
         <th class="px-4 py-3 text-left">Fecha Rendido</th>
         <th class="px-4 py-3 text-left">Fecha de Gasto</th>
+            <th class="px-4 py-3 text-left">Usuario</th>
+
         <th class="px-4 py-3 text-left">Local</th>
         <th class="px-4 py-3 text-left" style="min-width: 150px;">Proveedor</th>
         <th class="px-4 py-3 text-left">ID Requerimiento</th>
@@ -66,6 +68,8 @@
         <td class="px-4 py-3 text-sm">{{ gasto.id }}</td>
         <td class="px-4 py-3 text-sm fecha-rendido">{% if gasto.fecha_rendido %}{{ gasto.fecha_rendido|date:"d/m/Y" }}{% else %}-{% endif %}</td>
         <td class="px-4 py-3 text-sm">{{ gasto.fecha_gasto|date:"d/m/Y" }}</td>
+            <td class="px-4 py-3 text-sm">{{ gasto.usuario_creador.username }}</td>
+
         <td class="px-4 py-3 text-sm">{% if gasto.local %}{{ gasto.local.nombre_local }}{% else %}-{% endif %}</td>
         <td class="px-4 py-3 text-sm">{{ gasto.nombre_proveedor.razon_social|default:"-" }}</td>
         <td class="px-4 py-3 text-sm">{{ gasto.id_requerimiento|default:"-" }}</td>
@@ -171,7 +175,14 @@ $(document).on("click", ".generar-pdf", function() {
                     html = '<p class="text-gray-600 mt-4">No hay rendiciones asociadas a este gasto.</p>';
                 }
 
-                $("#rendiciones-container").html(html).slideDown("fast");
+$("#rendiciones-container")
+  .html(html)
+  .slideDown("fast", function() {
+    // Hacemos scroll suave hasta el contenedor
+    $('html, body').animate({
+      scrollTop: $("#rendiciones-container").offset().top
+    }, 500);
+  });
             },
             error: function() {
                 Swal.fire("Error", "Hubo un error al obtener las rendiciones.", "error");
@@ -196,7 +207,7 @@ document.getElementById("filtrar").addEventListener("click", function() {
     let fechaFin = new Date(fechaFinStr);
 
     // Restar 1 día a la fecha de inicio y sumar 1 día a la fecha fin
-    fechaInicio.setDate(fechaInicio.getDate() - 1);
+    fechaInicio.setDate(fechaInicio.getDate());
     fechaFin.setDate(fechaFin.getDate() + 1);
 
     // Función para convertir una fecha en formato "dd/mm/yyyy" a objeto Date

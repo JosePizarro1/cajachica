@@ -2,10 +2,8 @@
 
 {% block content %}
 {% load static %}
-
 <!-- Cargar Tailwind CSS -->
 <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
 <!-- Cargar DataTables -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.3/css/dataTables.tailwindcss.min.css">
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -19,13 +17,20 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
-
-
-
-
-<div class=" mx-auto px-4 py-6">
+<div class=" mx-auto px-4 py-3">
     <div class="bg-white shadow-lg rounded-lg p-6">
         <h2 class="text-3xl font-bold text-gray-700 mb-6 text-center">Listado de Préstamos</h2>
+              <!-- Botón resumen global -->
+      <div class="flex justify-end mb-4">
+        <a
+          href="{% url 'pdf_resumen_detallado' %}"
+          target="_blank"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition"
+        >
+          Resumen PDF Detallado
+        </a>
+      </div>
+
         <!-- Filtros -->
         <div class="mb-4 flex space-x-4">
             <label for="estadoFiltro" class="block text-sm font-medium text-gray-700">Filtrar por Estado:</label>
@@ -48,6 +53,7 @@
                         <th class="py-3 px-4 text-left">Monto Cuota</th>
                         <th class="py-3 px-4 text-left">Proveedor</th>
                         <th class="py-3 px-4 text-left">Notas</th>
+                         <th class="py-3 px-4 text-center">Estado</th>
                         <th class="py-3 px-4 text-center">Acción</th>
                     </tr>
                 </thead>
@@ -70,18 +76,45 @@
                         <td class="py-3 px-4">{{ data.proveedor.razon_social }}</td>
                         <td class="py-3 px-4">{{ data.notas }}</td>
                         <td class="py-3 px-4 text-center">
-                            {% if data.estado == "terminado" %}
-                                <span class="bg-green-500 text-white px-4 py-2 rounded-full">Completado</span>
-                            {% else %}
+                          {% if data.estado == 'terminado' %}
+                            <span
+                              class="whitespace-nowrap bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold"
+                            >
+                              {{ data.get_estado_display }}
+                            </span>
+                          {% else %}
+                            <span
+                              class="whitespace-nowrap bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-semibold"
+                            >
+                              {{ data.get_estado_display }}
+                            </span>
+                          {% endif %}
+                        </td>
+
+
+
+<td class="align-middle text-center py-3 px-4 space-x-2">
+  <div class="inline-flex items-center justify-center space-x-2">
+
+                                <!-- Botón para pago -->
                                 <button class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:opacity-80 transition open-modal"
                                     data-target="#pagoModal{{ data.id }}">
-                                    <i class="fas fa-sync-alt"></i>Pagar
+                                    <i class="fas fa-hand-holding-usd"></i>
                                 </button>
-                                <button onclick="verPagos({{ data.id }})" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:opacity-80 transition ml-2">
-                                    <i class="fas fa-eye"></i>Pagos
+
+                                <!-- Botón para ver pagos -->
+                                <button onclick="verPagos({{ data.id }})" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:opacity-80 transition">
+                                    <i class="fas fa-eye"></i>
                                 </button>
-                            {% endif %}
+
+                                <!-- Botón para ver o descargar PDF -->
+                                <a href="{% url 'pdf_detalleprestamo' data.id %}" target="_blank" class="bg-gray-500 text-white px-3 py-1 rounded-lg text-sm hover:opacity-80 transition">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                  </div>
+
                         </td>
+
 
                     </tr>
                     {% endfor %}
@@ -237,13 +270,26 @@ function verPagos(prestamoId) {
                 html += '  </div>';
                 html += '</div>';
             } else {
-                html = '<p class="text-gray-600 mt-4">No hay pagos registrados para esta cuota.</p>';
-            }
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Sin pagos registrados para la cuota actual',
+                    text: 'No hay pagos registrados para esta cuota.',
+                    confirmButtonText: 'Cerrar'
+                });
+                }
 
             pagosBody.innerHTML = html;
             pagosContainer.classList.remove("hidden");
         })
-        .catch(error => console.error("Error obteniendo los pagos:", error));
+        .catch(error => {
+            console.error("Error obteniendo los pagos:", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'No se pudieron cargar los pagos.',
+                confirmButtonText: 'Cerrar'
+            });
+        });
 }
 
 function finalizarCuota(prestamoId) {
@@ -306,10 +352,24 @@ $(document).ready(function() {
                 text: 'Exportar a Excel',
                 className: 'bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded',
                 title: 'Reporte de Gastos',
-                exportOptions: {
-                    columns: ':not(:first-child):not(:last-child)' // Excluye la primera (ID) y última columna (Acción)
+    exportOptions: {
+  columns: ':not(:first-child):not(:nth-last-child(2)):not(:last-child)',
+        format: {
+            body: function ( data, row, column, node ) {
+                // Si la celda es numérica con coma-decimal, la transformamos:
+                // 1) Eliminamos puntos de miles
+                // 2) Cambiamos coma decimal por punto
+                var d = data.toString();
+                // Si detectamos dígitos + coma al final, lo convertimos:
+                if ( d.match(/^[\d\.]+,\d{1,2}$/) ) {
+                    d = d.replace(/\./g, '')   // quita separadores de miles
+                         .replace(/,/g, '.'); // coma → punto
                 }
-            },
+                return d;
+            }
+        }
+    }
+},
             {
                 extend: 'pdfHtml5',
                 text: 'Exportar a PDF',
@@ -338,7 +398,7 @@ $(document).ready(function() {
                     });
                 },
                 exportOptions: {
-                    columns: ':not(:first-child):not(:last-child)' // Excluye la primera (ID) y última columna (Acción)
+                  columns: ':not(:first-child):not(:nth-last-child(2)):not(:last-child)'
                 }
             }
         ],
@@ -357,9 +417,9 @@ $(document).ready(function() {
         if (estado === "todos") {
             table.column(9).search('').draw(); // Restablece la columna 9 (Acción)
         } else if (estado === "proceso") {
-            table.column(9).search('Pagar', true, false).draw(); // Filtra los que contienen "Pagar"
+            table.column(9).search('En proceso', true, false).draw(); // Filtra los que contienen "Pagar"
         } else if (estado === "terminado") {
-            table.column(9).search('Completado', true, false).draw(); // Filtra los que contienen "Completado"
+            table.column(9).search('Terminado', true, false).draw(); // Filtra los que contienen "Completado"
         }
     });
 

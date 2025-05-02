@@ -42,7 +42,12 @@ urlpatterns = [
     path('ficha-ingreso/', ficha_ingreso_view, name='ficha_ingreso'),
     path('agregar_banco/', agregar_banco, name='agregar_banco'),
     path('descargarexcel/', descargar_excel, name='descargarexcel'),
+    path('descargarexcel1/', descargar_excel1, name='descargarexcel1'),
+
     path('prestamos/', prestamos, name='prestamos'),
+    path('prestamosirregular/', prestamos_irregular, name='prestamos_irregular'),
+    path('prestamos/irregulares/', ver_prestamos_irregulares, name='ver_prestamos_irregulares'),
+
     path('ver_prestamos/', ver_prestamos, name='ver_prestamos'),
     path('realizar_pago/', realizar_pago, name='realizar_pago'),
     path('reporte-anual/', reporte_anual, name='reporte_anual'),
@@ -86,6 +91,19 @@ urlpatterns = [
     path('gasto_calendario/', gasto_calendario, name='gasto_calendario'),
     path('obtener-total-mes/', obtener_total_mes, name='obtener_total_mes'),
     path('generar_reporte_pdf_calendario/', generar_reporte_pdf_calendario, name='generar_reporte_pdf_calendario'),
+    path('oauth2callback/',oauth2callback, name='oauth2callback'),
+    path('auth/', auth_gmail, name='auth_gmail'),  # Ruta para comenzar el flujo de OAuth2
+    path("personal/<int:id_personal>/detalle/",ver_personal_detallado, name="ver_personal_detallado"),
+    path('gastos/actualizar/<int:gasto_id>/', actualizar_gasto, name='actualizar_gasto'),
+    path('prestamos/<int:id>/pdf_detalleprestamo/',pdf_detalleprestamo,name='pdf_detalleprestamo'),
+    path('prestamos/<int:id>/pdf_detalleprestamo_irregular/',pdf_detalleprestamo_irregular,name='pdf_detalleprestamo_irregular'),
+
+
+    path('prestamos/pdf_resumen_detallado/',pdf_resumen_detallado,name='pdf_resumen_detallado'),
+    path('pagos/irregulares/realizar/',realizar_pago_irregular, name='realizar_pago_irregular'),
+    path('pagos/irregulares/ver/<int:prestamo_id>/', ver_pagos_irregulares, name='ver_pagos_irregulares'),
+    path('pagos/irregulares/finalizar/<int:prestamo_id>/', finalizar_prestamo_irregular, name='finalizar_prestamo_irregular'),
+
 
 ]
 if settings.DEBUG:

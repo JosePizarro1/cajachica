@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+
+<div class="container mx-auto mt-10 p-5 bg-white rounded shadow-lg">
+    <h2 class="text-2xl font-bold text-center mb-5">Préstamo Irregular</h2>
+
+    <form method="POST" id="form-prestamo">
+        {% csrf_token %}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <label for="fecha_prestamo" class="block text-sm font-medium text-gray-700">Fecha de Préstamo</label>
+                <input type="date" name="fecha_prestamo" id="fecha_prestamo" class="block w-full px-4 py-2 border rounded-md" required>
+            </div>
+
+            <div>
+                <label for="proveedor" class="block text-sm font-medium text-gray-700">Proveedor</label>
+                <select name="proveedor" id="proveedor" class="block w-full px-4 py-2 border rounded-md" required>
+                    <option value="">Seleccione un proveedor</option>
+                    {% for proveedor in proveedores %}
+                        <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="banco" class="block text-sm font-medium text-gray-700">Banco</label>
+                <select name="banco" id="banco" class="block w-full px-4 py-2 border rounded-md" required>
+                    <option value="">Seleccione un banco</option>
+                    {% for banco in bancos %}
+                        <option value="{{ banco.id }}">{{ banco.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="analista" class="block text-sm font-medium text-gray-700">Analista</label>
+                <input type="text" name="analista" id="analista" class="block w-full px-4 py-2 border rounded-md" required>
+            </div>
+
+            <div>
+                <label for="monto" class="block text-sm font-medium text-gray-700">Monto del Préstamo (Opcional)</label>
+                <input type="number" name="monto" id="monto" class="block w-full px-4 py-2 border rounded-md" step="0.01">
+            </div>
+
+            <div>
+                <label for="local" class="block text-sm font-medium text-gray-700">Local</label>
+                <select name="local" id="local" class="block w-full px-4 py-2 border rounded-md" required>
+                    <option value="">Seleccione un local</option>
+                    {% for local in locales %}
+                        <option value="{{ local.id }}">{{ local.nombre_local }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+              <label for="estado" class="block text-sm font-medium text-gray-700">Estado</label>
+              <select name="estado" id="estado" required
+                      class="block w-full px-4 py-2 border rounded-md">
+                <option value="proceso" selected>Proceso</option>
+                <option value="nuevo">Nuevo</option>
+              </select>
+            </div>
+
+            <div>
+                <label for="dia_pago" class="block text-sm font-medium text-gray-700">Día de Pago</label>
+                <input type="number" name="dia_pago" id="dia_pago" class="block w-full px-4 py-2 border rounded-md" min="1" max="31">
+            </div>
+
+            <div>
+                <label for="monto_cuota" class="block text-sm font-medium text-gray-700">Interés Mensual</label>
+                <input type="number" name="monto_cuota" id="monto_cuota" class="block w-full px-4 py-2 border rounded-md" step="0.01" required>
+            </div>
+
+            <div class="md:col-span-3">
+                <label for="notas" class="block text-sm font-medium text-gray-700">Notas</label>
+                <textarea name="notas" id="notas" class="block w-full px-4 py-2 border rounded-md" rows="3"></textarea>
+            </div>
+        </div>
+
+        <div class="text-center mt-5">
+            <button type="button" class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600" onclick="confirmarCreacion()">Crear Préstamo</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#proveedor').select2({
+            width: '100%'
+        });
+    });
+
+    function confirmarCreacion() {
+        if (!validarFormulario()) {
+            return;
+        }
+
+        Swal.fire({
+            title: '¿Estás seguro?',
+            text: '¡Estás a punto de crear un nuevo préstamo irregular!',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, crear préstamo',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('form-prestamo').submit();
+            }
+        });
+    }
+
+    function validarFormulario() {
+        let valid = true;
+        let camposFaltantes = [];
+
+        $('#form-prestamo input[required], #form-prestamo select[required]').each(function() {
+            let valor = $(this).val().trim();
+            if (valor === '') {
+                valid = false;
+                let label = $(this).closest('div').find('label').text().trim();
+                camposFaltantes.push(label);
+                $(this).addClass('border-red-500');
+            } else {
+                $(this).removeClass('border-red-500');
+            }
+        });
+
+        if (!valid) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Oops...',
+                html: 'Por favor completa los siguientes campos requeridos:<br><b>' + camposFaltantes.join('<br>') + '</b>'
+            });
+        }
+
+        return valid;
+    }
+</script>
+
+{% include 'mensaje.html' %}
+{% endblock %}

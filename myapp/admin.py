@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Fondo, Local, Concepto, CajaChica, Rendicion, Gasto, Ingreso,Proveedor,CuentaBancaria,Banco,Prestamo,SaldoInicial,Pago,Personal,Evento,OcurrenciaEvento
+from .models import Fondo, Local,PagoIrregular, Concepto, CajaChica,PrestamoIrregular, Rendicion, Gasto, Ingreso,Proveedor,CuentaBancaria,Banco,Prestamo,SaldoInicial,Pago,Personal,Evento,OcurrenciaEvento,HistorialGasto,HistorialIngreso
+from simple_history.admin import SimpleHistoryAdmin
+
 
 class OcurrenciaEventoInline(admin.TabularInline):
     model = OcurrenciaEvento
@@ -21,7 +23,17 @@ class OcurrenciaEventoAdmin(admin.ModelAdmin):
     search_fields = ('evento__titulo',)
     ordering = ('fecha',)
 
-
+@admin.register(PagoIrregular)
+class PagoIrregularAdmin(admin.ModelAdmin):
+    list_display  = ('id', 'prestamo_irregular', 'tipo_pago', 'monto_pagado', 'fecha_pago')
+    list_filter   = ('tipo_pago', 'fecha_pago')
+    search_fields = (
+        'prestamo_irregular__id',
+        'tipo_pago',
+        'fecha_pago',
+        'notas',
+    )
+    ordering      = ('-fecha_pago',)
 
 class PersonalAdmin(admin.ModelAdmin):
     list_display = ('dni','contraseña_creada', 'apellidos_nombres', 'celular', 'correo_personal', 'correo_corporativo')
@@ -105,7 +117,7 @@ class RendicionAdmin(admin.ModelAdmin):
     )
 
 @admin.register(Gasto)
-class GastoAdmin(admin.ModelAdmin):
+class GastoAdmin(SimpleHistoryAdmin):
     list_display = (
         'id',
         'fecha_gasto',
@@ -127,7 +139,7 @@ class GastoAdmin(admin.ModelAdmin):
 
 
 @admin.register(Ingreso)
-class IngresoAdmin(admin.ModelAdmin):
+class IngresoAdmin(SimpleHistoryAdmin):
     list_display = ('id', 'fecha_ingreso','usuario_creador', 'importe', 'id_fondo', 'metodo_pago', 'moneda', 'local')
     list_filter = ('fecha_ingreso', 'metodo_pago', 'moneda', 'local')
 @admin.register(Proveedor)
@@ -143,3 +155,58 @@ class CuentaBancariaAdmin(admin.ModelAdmin):
     list_display = ('id', 'proveedor', 'nombre_banco', 'numero_cuenta')
     search_fields = ('nombre_banco', 'numero_cuenta', 'proveedor__razon_social')
     list_filter = ('nombre_banco',)
+
+
+@admin.register(HistorialGasto)
+class HistorialGastoAdmin(admin.ModelAdmin):
+    list_display = (
+        'original_id',
+        'usuario_creador',
+        'fecha_registro',
+        'fecha_gasto',
+        'importe',
+        'observacion',
+        'fecha_eliminacion'
+    )
+    list_filter = ('usuario_creador', 'fecha_eliminacion', 'fecha_registro', 'fecha_gasto')
+    search_fields = ('original_id', 'usuario_creador__username', 'observacion')
+
+
+@admin.register(HistorialIngreso)
+class HistorialIngresoAdmin(admin.ModelAdmin):
+    list_display = (
+        'original_id',
+        'usuario_creador',
+        'fecha_registro',
+        'fecha_ingreso',
+        'importe',
+        'observacion',
+        'fecha_eliminacion'
+    )
+    list_filter = ('usuario_creador', 'fecha_eliminacion', 'fecha_registro', 'fecha_ingreso')
+    search_fields = ('original_id', 'usuario_creador__username', 'observacion')
+
+
+
+@admin.register(PrestamoIrregular)
+class PrestamoIrregularAdmin(admin.ModelAdmin):
+    list_display = (
+        'fecha_prestamo',
+        'proveedor',
+        'banco',
+        'analista',
+        'monto',
+        'interes_mensual',
+        'estado',
+    )
+    list_filter = (
+        'estado',
+        'banco',
+        'proveedor',
+        'local',
+    )
+    search_fields = (
+        'proveedor__razon_social',
+        'analista',
+    )
+    ordering = ('-fecha_prestamo',)

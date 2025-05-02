@@ -131,17 +131,25 @@
 
 
 
-<td class="py-2 px-3 text-center flex justify-center gap-2">
+<td class="py-2 px-3 text-center">
   {% if user.username != "naye1234" %}
-    <a href="{% url 'editar_personal' persona.id %}" class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-xs hover:bg-yellow-700 transition">
-      <i class="fas fa-edit"></i>
+    <div class="flex justify-center gap-1">
+      <a href="{% url 'editar_personal' persona.id %}" class="bg-yellow-500 text-white px-2 py-1 rounded-lg text-xs hover:bg-yellow-700 transition">
+        <i class="fas fa-edit"></i>
+      </a>
+      <a href="{% url 'generar_pdf' persona.id %}" class="bg-red-500 text-white px-2 py-1 rounded-lg text-xs hover:bg-red-700 transition generar-pdf" target="_blank">
+        <i class="fas fa-file-pdf"></i>
+      </a>
+    <a href="{% url 'ver_personal_detallado' persona.id %}"
+       class="bg-blue-500 text-white px-2 py-1 rounded-lg text-xs hover:bg-blue-700 transition"
+       title="Ver Detalle"
+       target="_blank">
+      <i class="fas fa-eye"></i>
     </a>
-    <a href="{% url 'generar_pdf' persona.id %}" class="bg-red-500 text-white px-2 py-1 rounded-lg text-xs hover:bg-red-700 transition generar-pdf" target="_blank">
-      <i class="fas fa-file-pdf"></i>
-    </a>
+
+    </div>
   {% endif %}
 </td>
-
   </tr>
   {% endfor %}
 </tbody>

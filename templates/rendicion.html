@@ -70,9 +70,24 @@
         </thead>
         <tbody class="divide-y divide-gray-300">
           {% for gasto in gastos %}
-    <tr class="hover:bg-gray-100" data-proveedor="{{ gasto.nombre_proveedor|default:"Sin proveedor" }}">
-            <td class="px-4 py-2">{{ gasto.nombre_proveedor|default:"Sin proveedor" }}</td>
-            <td class="px-4 py-2">REQ N°{{gasto.num_requerimiento}}(Id={{gasto.id_requerimiento}})</td>
+<tr class="hover:bg-gray-100"
+    data-proveedor="{% if gasto.nombre_proveedor %}{{ gasto.nombre_proveedor.razon_social }}{% else %}Sin proveedor{% endif %}">
+    <td class="px-4 py-2">
+  {% if gasto.nombre_proveedor %}
+    {{ gasto.nombre_proveedor.razon_social }}
+  {% else %}
+    Sin proveedor
+  {% endif %}
+</td>
+
+
+            <td class="px-4 py-2">
+              {% if gasto.num_requerimiento %}
+                REQ N°{{ gasto.num_requerimiento }} (Id={{ gasto.id_requerimiento }})
+              {% else %}
+                  Sin requerimiento
+              {% endif %}
+            </td>
             <td class="px-4 py-2">{{ gasto.local.nombre_local }}</td>
             <td class="px-4 py-2">{{ gasto.moneda }}</td>
             <td class="px-4 py-2">{{ gasto.fecha_gasto|date:"d/m/Y" }}</td>
@@ -101,42 +116,7 @@
     </div>
   </div>
 </main>
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    let filtroProveedor = document.getElementById("filtro-proveedor");
-    let tabla = document.getElementById("tabla-gastos");
-    let filas = tabla.getElementsByTagName("tr");
 
-    // Obtener proveedores únicos
-    let proveedores = new Set();
-    for (let i = 1; i < filas.length; i++) { // Saltamos la cabecera
-      let proveedor = filas[i].getAttribute("data-proveedor");
-      if (proveedor) proveedores.add(proveedor);
-    }
-
-    // Llenar el select con proveedores únicos
-    proveedores.forEach(proveedor => {
-      let option = document.createElement("option");
-      option.value = proveedor;
-      option.textContent = proveedor;
-      filtroProveedor.appendChild(option);
-    });
-
-    // Filtrar la tabla según el proveedor seleccionado
-    filtroProveedor.addEventListener("change", function () {
-      let seleccion = this.value;
-      for (let i = 1; i < filas.length; i++) {
-        let fila = filas[i];
-        let proveedor = fila.getAttribute("data-proveedor");
-        if (seleccion === "todos" || proveedor === seleccion) {
-          fila.style.display = "";
-        } else {
-          fila.style.display = "none";
-        }
-      }
-    });
-  });
-</script>
 <script>
   $(document).ready(function() {
     var table = $('#tabla-gastos').DataTable({
@@ -153,7 +133,21 @@
           className: 'bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded',
           title: 'Reporte de Gastos',
           exportOptions: {
-            columns: ':not(:last-child)' // Excluye la última columna
+            columns: ':not(:last-child)', // Excluye la última columna
+                    format: {
+            body: function ( data, row, column, node ) {
+                // Si la celda es numérica con coma-decimal, la transformamos:
+                // 1) Eliminamos puntos de miles
+                // 2) Cambiamos coma decimal por punto
+                var d = data.toString();
+                // Si detectamos dígitos + coma al final, lo convertimos:
+                if ( d.match(/^[\d\.]+,\d{1,2}$/) ) {
+                    d = d.replace(/\./g, '')   // quita separadores de miles
+                         .replace(/,/g, '.'); // coma → punto
+                }
+                return d;
+            }
+            }
           }
         },
         {
@@ -180,14 +174,25 @@
 
     table.buttons().container().appendTo('#buttons-container');
 
+  table
+    .column(0)
+    .data()
+    .unique()
+    .sort()
+    .each(function(d) {
+      $('#filtro-proveedor').append(
+        $('<option>').val(d).text(d)
+      );
+    });
+
     // Filtro de proveedores
     $('#filtro-proveedor').on('change', function() {
-        var seleccion = this.value;
-        if (seleccion === "todos") {
-            table.search('').draw(); // Restablece la búsqueda
-        } else {
-            table.search(seleccion).draw(); // Filtra la tabla con DataTables
-        }
+      var val = this.value;
+      if (val === 'todos') {
+        table.column(0).search('').draw();
+      } else {
+        table.column(0).search('^' + val + '$', true, false).draw();
+      }
     });
 
     // Redibuja la tabla cuando cambia el filtro

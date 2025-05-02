@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
+from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 
 
@@ -122,6 +124,25 @@ class Pago(models.Model):
     def __str__(self):
         return f"Pago {self.id} - Cuota {self.cuota} - Monto: {self.monto_pagado}"
 
+class PagoIrregular(models.Model):
+    TIPO_PAGO_CHOICES = [
+        ('capital', 'Capital'),
+        ('intereses', 'Intereses'),
+    ]
+
+    prestamo_irregular = models.ForeignKey(
+        'PrestamoIrregular',
+        on_delete=models.CASCADE,
+        related_name='pagos_irregulares'
+    )
+    tipo_pago   = models.CharField(max_length=20, choices=TIPO_PAGO_CHOICES)
+    monto_pagado = models.DecimalField(max_digits=10, decimal_places=2)
+    fecha_pago   = models.DateField()
+    notas        = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"PagoIrregular {self.id} - {self.get_tipo_pago_display()} - S/ {self.monto_pagado}"
+
 
 # Modelo para la tabla "CajaChica"
 class CajaChica(models.Model):
@@ -146,7 +167,7 @@ from datetime import date
 
 class Gasto(models.Model):
     usuario_creador = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name='gastos_creados')
-    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
+    fecha_registro = models.DateField(default=timezone.now, blank=True, null=True)
     fecha_gasto = models.DateField(blank=True, null=True)
     concepto_nivel_1 = models.ForeignKey(Concepto, null=True, blank=True, related_name='nivel_1', on_delete=models.CASCADE)
     concepto_nivel_2 = models.ForeignKey(Concepto, null=True, blank=True, related_name='nivel_2', on_delete=models.CASCADE)
@@ -154,7 +175,9 @@ class Gasto(models.Model):
     nombre_proveedor = models.ForeignKey(Proveedor,on_delete=models.SET_NULL,null=True,blank=True,related_name='gastos')
     local = models.ForeignKey(Local, null=True, blank=True, on_delete=models.SET_NULL, related_name='gastos_local')
     tipo_comprobante = models.CharField(max_length=50, null=True, blank=True)
-    num_comprobante = models.CharField(max_length=80, null=True, blank=True)  # Campo agregado
+    # NO SE USA ESTA VARIABLE
+    num_comprobante = models.CharField(max_length=80, null=True, blank=True)  # NO SE USA ESTA VARIABLE
+    #######
     fecha_emision_comprobante = models.DateField(null=True, blank=True)  # Campo agregado
     numero_comprobante = models.CharField(max_length=80, null=True, blank=True)
     tipo_pago = models.CharField(max_length=50, null=True, blank=True)
@@ -179,6 +202,11 @@ class Gasto(models.Model):
             ('Administracion', 'Administracion'),
             ('Marketing', 'Marketing'),
             ('Ventas', 'Ventas'),
+            ('Almacen', 'Almacen'),
+            ('Tesoreria', 'Tesoreria'),
+
+
+
         ],
         null=True,
         blank=True
@@ -212,6 +240,13 @@ class Gasto(models.Model):
         on_delete=models.CASCADE,  # Si se borra el gasto original, se borran los generados
         related_name='gastos_generados'
     )
+    prestamo_irregular = models.ForeignKey(
+        'PrestamoIrregular',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='gastos_irregulares'
+    )
+    history = HistoricalRecords()  # Agrega historial al modelo
 
     def concepto_mayor_nivel(self):
         """
@@ -277,12 +312,61 @@ class Prestamo(models.Model):
     dia_pago = models.PositiveIntegerField(default=1,blank=True,null=True)
     monto_cuota = models.DecimalField(max_digits=10, decimal_places=2, default=0,blank=True, null=True)  # Nuevo campo
     notas = models.TextField(blank=True, null=True)  # Nuevo campo agregado
+    tcea = models.DecimalField(max_digits=5, decimal_places=2,blank=True, null=True)
+
+
+class PrestamoIrregular(models.Model):
+    ESTADO_CHOICES = [
+        ('proceso', 'En proceso'),
+        ('terminado', 'Terminado'),
+    ]
+
+    fecha_prestamo = models.DateField(verbose_name='Fecha de Prestamo')
+    proveedor = models.ForeignKey('Proveedor', on_delete=models.CASCADE, verbose_name='Proveedor')
+    banco = models.ForeignKey('Banco', on_delete=models.CASCADE, verbose_name='Banco')
+    analista = models.CharField(max_length=100, verbose_name='Analista')
+    monto = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name='Monto del Prestamo'
+    )
+    local = models.ForeignKey('Local', on_delete=models.CASCADE, verbose_name='Local')
+    dia_pago = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name='Dia de Pago'
+    )
+    interes_mensual = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name='Interes Mensual'
+    )
+    notas = models.TextField(blank=True, null=True, verbose_name='Notas')
+    estado = models.CharField(
+        max_length=50,
+        choices=ESTADO_CHOICES,
+        default='proceso',
+        verbose_name='Estado'
+    )
+
+    class Meta:
+        verbose_name = 'Prestamo Irregular'
+        verbose_name_plural = 'Prestamos Irregulares'
+        ordering = ['-fecha_prestamo']
+
+    def __str__(self):
+        return f"Prestamo irregular de {self.proveedor} el {self.fecha_prestamo}"
 
 
 class Ingreso(models.Model):
     usuario_creador = models.ForeignKey(User,on_delete=models.SET_NULL,null=True,blank=True,related_name='ingresos_creados')
     prestamo = models.ForeignKey('Prestamo',on_delete=models.SET_NULL,null=True,blank=True,related_name='ingresos')
-    fecha_registro = models.DateField(auto_now_add=True,blank=True, null=True)  # Esta l¨ªnea agregar¨¢ la fecha autom¨¢tica
+    prestamo_irregular = models.ForeignKey('PrestamoIrregular',on_delete=models.SET_NULL,null=True,blank=True,related_name='ingresos_irregulares')
+    fecha_registro = models.DateField(default=timezone.now, blank=True, null=True)
     fecha_ingreso = models.DateField(blank=True, null=True)
     importe = models.DecimalField(max_digits=10, decimal_places=2)
     id_fondo = models.ForeignKey(Fondo, on_delete=models.CASCADE, null=True, blank=True)  # Permitir valores nulos
@@ -304,6 +388,8 @@ class Ingreso(models.Model):
         on_delete=models.SET_NULL,
         related_name='ingreso_generado'
     )
+    history = HistoricalRecords()  # Agrega historial al modelo
+
     def __str__(self):
         return f"Ingreso {self.id}"
 
@@ -352,10 +438,143 @@ class Personal(models.Model):
     turno_tarde_fin = models.TimeField(null=True, blank=True)
 
     observacion = models.TextField(null=True, blank=True)
+    link_drive = models.URLField(blank=True, null=True, verbose_name="Enlace de Google Drive")
 
     def __str__(self):
         return f"{self.apellidos_nombres} - {self.dni}"
 
+
+class HistorialGasto(models.Model):
+    original_id = models.IntegerField(null=True, blank=True)  # ID del registro original de Gasto
+    usuario_creador = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historial_gastos_creados'
+    )
+    fecha_registro = models.DateField(null=True, blank=True)
+    fecha_gasto = models.DateField(null=True, blank=True)
+
+    # Campos adicionales que pueden ser relevantes para tu historial
+    tipo_comprobante = models.CharField(max_length=50, null=True, blank=True)
+    num_comprobante = models.CharField(max_length=80, null=True, blank=True)
+    fecha_emision_comprobante = models.DateField(null=True, blank=True)
+    numero_comprobante = models.CharField(max_length=80, null=True, blank=True)
+    tipo_pago = models.CharField(max_length=50, null=True, blank=True)
+    fecha_operacion = models.DateField(null=True, blank=True)
+    codigo_operacion = models.CharField(max_length=50, null=True, blank=True)
+    observacion = models.TextField(null=True, blank=True)
+
+    importe = models.DecimalField(max_digits=10, decimal_places=2)
+    moneda = models.CharField(max_length=50)
+
+    rendido = models.BooleanField(default=False, null=True, blank=True)
+    fecha_rendido = models.DateField(null=True, blank=True)
+
+    id_requerimiento = models.CharField(max_length=100, null=True, blank=True)
+    num_requerimiento = models.CharField(max_length=100, null=True, blank=True)
+
+    campo_area = models.CharField(
+        max_length=50,
+        choices=[
+            ('Sistemas', 'Sistemas'),
+            ('Academico', 'Academico'),
+            ('Imagen', 'Imagen'),
+            ('Gerencia', 'Gerencia'),
+            ('Administracion', 'Administracion'),
+            ('Marketing', 'Marketing'),
+            ('Ventas', 'Ventas'),
+            ('Almacen', 'Almacen'),
+            ('Tesoreria', 'Tesoreria'),
+        ],
+        null=True,
+        blank=True
+    )
+    campo_mes = models.CharField(
+        max_length=20,
+        choices=[
+            ('Enero', 'Enero'),
+            ('Febrero', 'Febrero'),
+            ('Marzo', 'Marzo'),
+            ('Abril', 'Abril'),
+            ('Mayo', 'Mayo'),
+            ('Junio', 'Junio'),
+            ('Julio', 'Julio'),
+            ('Agosto', 'Agosto'),
+            ('Septiembre', 'Septiembre'),
+            ('Octubre', 'Octubre'),
+            ('Noviembre', 'Noviembre'),
+            ('Diciembre', 'Diciembre'),
+        ],
+        null=True,
+        blank=True
+    )
+    concepto_nivel_1 = models.ForeignKey(
+        Concepto,
+        null=True,
+        blank=True,
+        related_name='historialgasto_concepto_nivel_1',
+        on_delete=models.CASCADE
+    )
+    concepto_nivel_2 = models.ForeignKey(
+        Concepto,
+        null=True,
+        blank=True,
+        related_name='historialgasto_concepto_nivel_2',
+        on_delete=models.CASCADE
+    )
+    concepto_nivel_3 = models.ForeignKey(
+        Concepto,
+        null=True,
+        blank=True,
+        related_name='historialgasto_concepto_nivel_3',
+        on_delete=models.CASCADE
+    )
+
+    nombre_proveedor = models.ForeignKey(
+        Proveedor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historialgasto_proveedor',
+
+    )
+
+    # Fecha en la que se registra la eliminación (asignada automáticamente)
+    fecha_eliminacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"HistorialGasto {self.original_id} - Eliminado el {self.fecha_eliminacion}"
+
+class HistorialIngreso(models.Model):
+    original_id = models.IntegerField(null=True, blank=True)  # ID del registro original de Ingreso
+    usuario_creador = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historial_ingresos_creados'
+    )
+    fecha_registro = models.DateField(null=True, blank=True)
+    fecha_ingreso = models.DateField(null=True, blank=True)
+
+    importe = models.DecimalField(max_digits=10, decimal_places=2)
+    metodo_pago = models.CharField(max_length=50, null=True, blank=True)
+    moneda = models.CharField(max_length=50)
+    fecha_operacion = models.DateField(null=True, blank=True)
+    codigo_operacion = models.CharField(max_length=50, null=True, blank=True)
+    observacion = models.TextField(null=True, blank=True)
+
+    extorno = models.BooleanField(default=False, null=True, blank=True)
+    importe_efectivo = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    importe_yape = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    # Fecha en la que se registra la eliminación (asignada automáticamente)
+    fecha_eliminacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"HistorialIngreso {self.original_id} - Eliminado el {self.fecha_eliminacion}"
 
 
 

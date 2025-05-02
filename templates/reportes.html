@@ -441,52 +441,91 @@ function generarPDF(data) {
         return;
     }
     const doc = new jsPDF();
+
+    // Obtener fechas del formulario y formatear
+    const fechaInicioInput = $('#formReporte #fecha_inicio').val();
+    const fechaFinalInput = $('#formReporte #fecha_final').val();
+    function formatDate(input) {
+        if (!input) return '';
+        const [year, month, day] = input.split('-');
+        return `${day}/${month}/${year}`;
+    }
+    const fechaInicioFmt = formatDate(fechaInicioInput);
+    const fechaFinalFmt = formatDate(fechaFinalInput);
+
+    // Título centrado
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    const conceptoNivel1Texto = $('#concepto_nivel_1 option:selected').text(); // Agregado
-    const title = `Reporte - ${conceptoNivel1Texto}`; // Agregado
+    const conceptoNivel1Texto = $('#formReporte #concepto_nivel_1 option:selected').text();
+    const title = `Reporte - ${conceptoNivel1Texto}`;
     const titleWidth = doc.getStringUnitWidth(title) * doc.getFontSize() / doc.internal.scaleFactor;
-    const titleX = (doc.internal.pageSize.width - titleWidth) / 2; // Calculamos el X para centrar el título
-    doc.text(title, titleX, 20); // Posicionamos el título en la página (X, Y)
+    const titleX = (doc.internal.pageSize.width - titleWidth) / 2;
+    doc.text(title, titleX, 20);
+
+    // Encabezado de rango de fechas
     doc.setFontSize(12);
     doc.setFont("helvetica", "normal");
-    doc.text(`Fecha: ${data.fecha}`, 20, 30); // Posición Y para la fecha del reporte (20, 30)
+    if (fechaInicioFmt && fechaFinalFmt) {
+        doc.text(`Fecha: del ${fechaInicioFmt} al ${fechaFinalFmt}`, 20, 30);
+    } else {
+        doc.text("Fecha: no especificada", 20, 30);
+    }
 
-    let yPosition = 40;  // La posición de inicio para la tabla y los títulos del grupo
+    let yPosition = 40;
     data.gastos_por_grupo.forEach(group => {
-        // Definir las columnas de la tabla, agregando la columna Observación
+        // Columnas y datos de la tabla
         const columns = ["Proveedor", "Concepto", "Forma de Pago", "Importe", "Fecha", "Observación"];
-        const tableData = [];
-        for (let i = 0; i < group.gastos.length; i++) {
-            const gasto = group.gastos[i];
+        const tableData = group.gastos.map(gasto => {
             const importe = parseFloat(gasto.importe);
             const importeFormateado = isNaN(importe) ? "0.00" : importe.toFixed(2);
-            tableData.push([
+            return [
                 gasto.proveedor,
                 gasto.concepto,
                 gasto.forma_pago,
                 importeFormateado,
                 gasto.fecha,
-                gasto.observacion  // Nueva columna: Observación
-            ]);
-        }
+                gasto.observacion
+            ];
+        });
+
+        // Encabezado de grupo
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.text(`Concepto Nivel 2: ${group.nivel_2}`, 20, yPosition);
-        yPosition += 10;  // Ajustamos el espacio antes de la tabla
-        doc.autoTable(columns, tableData, {
-            margin: { top: yPosition }, // La tabla comienza en la posición 'yPosition'
-            styles: { fontSize: 10 },
-            startY: yPosition, // Comienza en la posición 'yPosition'
+        yPosition += 8;
+
+        // Tabla con autoTable v3+ API
+        doc.autoTable({
+            head: [columns],
+            body: tableData,
+            startY: yPosition,
+            margin: { left: 20, right: 20, bottom: 20 },
+            styles: { fontSize: 10, cellPadding: 2, overflow: 'linebreak' },
+            headStyles: { fillColor: [40, 127, 186], textColor: 255, halign: 'center' },
+            bodyStyles: { textColor: [75, 85, 99], halign: 'center' },
+            theme: 'striped',
+            pageBreak: 'auto'
         });
-        yPosition = doc.lastAutoTable.finalY + 10;  // La posición Y para el siguiente título de grupo
+
+        // Actualizar posición Y al final de la tabla
+        yPosition = doc.lastAutoTable.finalY + 10;
     });
+
+    // Total
     const totalImporte = parseFloat(data.total_importe);
-    const totalImporteFormateado = isNaN(totalImporte) ? "0.00" : totalImporte.toFixed(2);
-    const totalText = `Total Importe: ${totalImporteFormateado}`;
-    doc.text(totalText, 20, yPosition); // Imprime el total en la posición X=20, Y= después de la última tabla
+    const totalFormateado = isNaN(totalImporte) ? "0.00" : totalImporte.toFixed(2);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    if (yPosition + 10 > doc.internal.pageSize.height - 20) {
+        doc.addPage();
+        yPosition = 20;
+    }
+    doc.text(`Total Importe: ${totalFormateado}`, 20, yPosition);
+
     doc.save("reporte_gastos.pdf");
 }
+
+
 
 
 
@@ -535,6 +574,7 @@ function generarPDF(data) {
     });
 </script>
 
-
+<!-- Incluyendo mensajes -->
+{% include 'mensaje.html' %}
 
 {% endblock %}

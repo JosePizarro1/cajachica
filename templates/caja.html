@@ -158,11 +158,15 @@
     class="bg-green-500 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200">
     Reporte detallado
   </button>
+    <button
+    id="downloadExcelBtn1"
+    class="bg-blue-500 text-white px-4 py-2 rounded-md text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200">
+    Reporte detallado +rendicion
+  </button>
 {% if not request.user.is_staff %}
 <button
   id="dailyReportBtn"
-  class="bg-blue-500 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-  onclick="window.location.href='{% url 'reporte_diario' %}?saldo_inicial={{ saldo_inicial|floatformat:2 }}'">
+  class="bg-blue-500 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
   Reporte Diario
 </button>
 
@@ -174,7 +178,9 @@
         <thead class="text-xs uppercase bg-gray-100 text-gray-700 border-b">
             <tr>
                 <th class="px-4 py-2 border-r"></th>
-                <th class="px-4 py-2 border-r">Fecha</th>
+                        <th class="px-4 py-2 border-r">Fecha de Digitacion</th><!--variable en sin automatica de creacion llamada ahora Digitacion solo visual -->
+
+                <th class="px-4 py-2 border-r">Fecha de Registro</th>  <!--variable en sin fecha_operacion -->
                 {% if user.is_staff %}
                     <th class="px-4 py-2 border-r">Usuario</th> <!-- Columna extra para el usuario -->
                 {% endif %}
@@ -209,7 +215,10 @@
                         {% if item.tipo == 'Gasto' %} Gasto {% elif item.tipo == 'Extorno' %} Extorno {% else %} Ingreso {% endif %}
                     </span>
                 </td>
+                                <td class="px-4 py-2 border-r">{{ item.fecha_registro }}</td>
+
                 <td class="px-4 py-2 border-r">{{ item.fecha }}</td>
+
                 {% if user.is_staff %}
                     <td class="px-4 py-2 border-r">{{ item.usuario_creador }}</td>
                 {% endif %}
@@ -237,11 +246,8 @@
                         </a>
                     {% endif %}
 
-                    {% if item.concepto == 'Requerimiento' or item.concepto == 'Sin Requerimiento' and not item.rendido %}
-                    <p class="bg-red-500 text-white font-bold text-center py-2 px-4 rounded">Rendir</p>
-                    {% endif %}
 
-                    {% if item.tipo == "Gasto" or item.tipo == "Extorno" %}
+                    {% if item.tipo == "Gasto" or item.tipo == "Ingreso" %}
                     <!-- Enlace que abre el modal -->
                     <a href="javascript:void(0);" class="text-yellow-500 hover:text-yellow-700"
                        data-bs-toggle="modal"
@@ -253,6 +259,9 @@
                        data-concepto2="{{ item.concepto_nivel_2_id }}"
                        data-concepto3="{{ item.concepto_nivel_3_id }}"
                        data-requerimiento="{{item.tipo_item }}"
+                       data-proveedor="{{item.id_proveedor}}"
+                       data-fecha_gasto="{{item.fecha}}"
+
                        >
                         <i class="fas fa-pen"></i>
                     </a>
@@ -343,65 +352,99 @@
         </div>
     </div>
 </div>
+<!-- Modal para Editar Movimiento -->
 <div id="editModal" class="fixed inset-0 z-50 hidden bg-gray-800 bg-opacity-50 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen">
-        <!-- Modal content -->
-        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl">
-            <h2 id="modalTitle" class="text-2xl font-bold mb-4 text-center">Editar Movimiento</h2>
-            <!-- Formulario de edición -->
-            <form id="updateForm" method="post" action="{% url 'actualizar_movimiento' %}">
-                {% csrf_token %}
-                <!-- Campo oculto para el ID -->
-                <input type="hidden" id="movimientoId" name="id" />
-                <!-- Campo oculto para el Tipo (Gasto o Ingreso) -->
-                <input type="hidden" id="movimientoTipo" name="tipo" />
+  <div class="flex items-center justify-center min-h-screen px-4">
+    <!-- Contenido del modal -->
+    <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl flex flex-col" style="max-height: 90vh; margin: 1rem;">
 
-                <div class="mb-4">
-                    <label for="movimientoNotas" class="block text-sm font-medium text-gray-700">Notas</label>
-                    <textarea
-                        id="movimientoNotas"
-                        name="notas"
-                        required
-                        rows="3"
-                        class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-y"
-                        placeholder="Escribe tus notas aquí..."></textarea>
-                </div>
-
-                <!-- Sección de Conceptos (Visible solo si es Gasto) -->
-                <div id="conceptosSection" class="hidden">
-                    <div class="mb-4">
-                        <label for="concepto_nivel_1_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 1</label>
-                        <select id="concepto_nivel_1_results" name="concepto_nivel_1" class="w-full block select2">
-                            <option value="">Seleccionar</option>
-                            {% for concepto in nivel_1_conceptos %}
-                                <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="concepto_nivel_2_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 2</label>
-                        <select id="concepto_nivel_2_results" name="concepto_nivel_2" class="w-full block select2">
-                            <option value="">Seleccionar</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="concepto_nivel_3_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 3</label>
-                        <select id="concepto_nivel_3_results" name="concepto_nivel_3" class="w-full block select2">
-                            <option value="">Seleccionar</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="flex justify-end space-x-4">
-                    <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600" onclick="closeModal('editModal')">Cerrar</button>
-                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Actualizar</button>
-                </div>
-            </form>
+      <!-- Header con degradado -->
+      <div class="bg-gradient-to-r from-blue-400 to-blue-600 p-4 rounded-t-lg">
+        <div class="flex justify-between items-center">
+          <h2 id="modalTitle" class="text-2xl font-bold text-white">Editar Movimiento</h2>
+          <button id="closeModalBtn" class="text-white hover:text-gray-200 transition-colors duration-200" onclick="closeModal('editModal')">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
         </div>
+      </div>
+
+      <!-- Formulario de edición -->
+      <form id="updateForm" method="post" action="{% url 'actualizar_movimiento' %}">
+        {% csrf_token %}
+        <!-- Campo oculto para el ID -->
+        <input type="hidden" id="movimientoId" name="id">
+        <!-- Campo oculto para el Tipo (Gasto o Ingreso) -->
+        <input type="hidden" id="movimientoTipo" name="tipo">
+
+        <div class="p-6 overflow-y-auto">
+
+            <!-- Nueva Fila: Fecha de operación -->
+            <div class="mb-4">
+              <label for="fechaOperacion" class="block text-sm font-medium text-gray-700">Fecha de operación</label>
+              <input type="date" id="fechaOperacion" name="fechaOperacion"
+                     class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 requerid">
+            </div>
+
+
+          <!-- Fila 1: Notas -->
+          <div class="mb-4">
+            <label for="movimientoNotas" class="block text-sm font-medium text-gray-700">Notas</label>
+            <textarea id="movimientoNotas" name="notas" required rows="3"
+                      class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-y"
+                      placeholder="Escribe tus notas aquí..."></textarea>
+          </div>
+
+          <!-- Fila 2: Proveedor -->
+            <!-- Fila 2: Proveedor -->
+            <div id="providerRow" class="mb-4 hidden">
+              <label for="movimientoProveedor" class="block text-sm font-medium text-gray-700">Proveedor</label>
+              <select id="movimientoProveedor" name="proveedor" class="w-full mt-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Seleccionar proveedor</option>
+                {% for proveedor in proveedores %}
+                  <option value="{{ proveedor.id }}">{{ proveedor.razon_social }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+
+          <!-- Fila 3: Sección de Conceptos (Visible solo si es Gasto) -->
+          <div id="conceptosSection" class="hidden">
+            <div class="mb-4">
+              <label for="concepto_nivel_1_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 1</label>
+              <select id="concepto_nivel_1_results" name="concepto_nivel_1" class="w-full block select2">
+                <option value="">Seleccionar</option>
+                {% for concepto in nivel_1_conceptos %}
+                  <option value="{{ concepto.id }}">{{ concepto.concepto_nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label for="concepto_nivel_2_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 2</label>
+              <select id="concepto_nivel_2_results" name="concepto_nivel_2" class="w-full block select2">
+                <option value="">Seleccionar</option>
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label for="concepto_nivel_3_results" class="block text-sm font-medium text-gray-700">Concepto Nivel 3</label>
+              <select id="concepto_nivel_3_results" name="concepto_nivel_3" class="w-full block select2">
+                <option value="">Seleccionar</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Botones de acción -->
+          <div class="flex justify-end space-x-4 mt-4">
+            <button type="button" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600" onclick="closeModal('editModal')">Cerrar</button>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Actualizar</button>
+          </div>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
+
 
 
 
@@ -572,6 +615,16 @@ document.getElementById('downloadExcelBtn').addEventListener('click', function()
     // Redirigir al usuario a la URL generada
     window.location.href = url;
 });
+document.getElementById('downloadExcelBtn1').addEventListener('click', function() {
+    // Capturar las fechas de los inputs
+    var fecha_inicio = document.getElementById('fecha_inicio').value;
+    var fecha_fin = document.getElementById('fecha_fin').value;
+    // Crear la URL con los parámetros de fecha
+    var url = "{% url 'descargarexcel1' %}?fecha_inicio=" + fecha_inicio + "&fecha_fin=" + fecha_fin;
+
+    // Redirigir al usuario a la URL generada
+    window.location.href = url;
+});
 </script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
@@ -638,20 +691,32 @@ document.getElementById('downloadExcelBtn').addEventListener('click', function()
                 const concepto2 = this.getAttribute("data-concepto2");
                 const concepto3 = this.getAttribute("data-concepto3");
                 const requerimiento=this.getAttribute("data-requerimiento");
+                const proveedor=this.getAttribute("data-proveedor");
+                const fecha_gasto_raw = this.getAttribute("data-fecha_gasto"); // 10/4/2025
+                $('#concepto_nivel_1_results').val('').trigger('change');
+                $('#concepto_nivel_2_results').empty().append('<option value="">Seleccionar</option>').trigger('change');
+                $('#concepto_nivel_3_results').empty().append('<option value="">Seleccionar</option>').trigger('change');
 
-                console.log(`ℹ️ Datos recibidos -> ID: ${id}, Notas: ${notas}, Tipo: ${tipo}`);
+                // Convertir de DD/MM/YYYY a YYYY-MM-DD
+                const [dia, mes, anio] = fecha_gasto_raw.split("/");
+                const fecha_gasto_formateada = `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
+
+                console.log(`ℹ️ Datos recibidos -> ID: ${id}, Notas: ${notas}, Tipo: ${tipo} ,Fecha_Gasto: ${fecha_gasto_formateada}`);
+
                 console.log(`ℹ️ Conceptos -> Nivel1: ${concepto1}, Nivel2: ${concepto2}, Nivel3: ${concepto3},Requerimiento: ${requerimiento},`);
+                console.log(`ℹ️ Proveedor -> ID: ${proveedor}`);
 
                 // Asignar valores al formulario
                 document.getElementById("movimientoId").value = id;
                 document.getElementById("movimientoNotas").value = notas;
                 document.getElementById("modalTitle").innerText = `Editar Movimiento #${id}`;
                 document.getElementById("movimientoTipo").value = tipo;
+                document.getElementById("fechaOperacion").value = fecha_gasto_formateada;
 
                 console.log("✅ Valores asignados al formulario.");
 
                 // Mostrar sección de conceptos si el tipo es "Gasto"
-                if (tipo === "Gasto" && requerimiento !== "Requerimiento") {
+                if (tipo === "Gasto" && requerimiento !== "Requerimiento" && requerimiento !== "Sin Requerimiento") {
                     console.log("📌 Tipo es 'Gasto', mostrando select de conceptos.");
                     conceptosSection.classList.remove("hidden");
 
@@ -679,6 +744,25 @@ document.getElementById('downloadExcelBtn').addEventListener('click', function()
                 } else {
                     console.log("📌 Tipo NO es 'Gasto', ocultando select de conceptos.");
                 }
+                // Mostrar sección de proveedor si el atributo data-proveedor tiene un valor distinto de null y de "0"
+                if (proveedor && proveedor !== "0") {
+                    console.log("📌 Proveedor presente, mostrando fila de proveedor y marcándola como requerida.");
+                    // Quitamos la clase "hidden" al contenedor de la fila
+                    document.getElementById("providerRow").classList.remove("hidden");
+                    // Marcar select como requerido
+                    document.getElementById("movimientoProveedor").setAttribute("required", "true");
+
+                    // Preseleccionar el proveedor
+                    setTimeout(() => {
+                        $("#movimientoProveedor").val(proveedor).trigger("change");
+                        console.log("✅ Proveedor preseleccionado:", proveedor);
+                    }, 100);
+                } else {
+                    console.log("📌 No se requiere mostrar proveedor.");
+                    // Si no cumple la condición, se podría ocultar el contenedor y quitar el atributo required.
+                    document.getElementById("providerRow").classList.add("hidden");
+                    document.getElementById("movimientoProveedor").removeAttribute("required");
+                }
 
                 // Mostrar el modal
                 document.getElementById("editModal").classList.remove("hidden");
@@ -692,22 +776,54 @@ document.getElementById('downloadExcelBtn').addEventListener('click', function()
         };
     });
 
-    function closeModal(modalId) {
-        console.log(`🔴 Cerrando modal: ${modalId}`);
-        // Si es el modal de edición, limpiar los campos para evitar que persistan los valores
-        if (modalId === 'editModal') {
-            $('#concepto_nivel_1_results').val('').trigger('change');
-            $('#concepto_nivel_2_results').empty().append('<option value="">Seleccionar</option>').trigger('change');
-            $('#concepto_nivel_3_results').empty().append('<option value="">Seleccionar</option>').trigger('change');
-            document.getElementById("movimientoNotas").value = "";
-            document.getElementById("movimientoTipo").value = "";
-            document.getElementById("modalTitle").innerText = "Editar Movimiento";
-        }
-        document.getElementById(modalId).classList.add('hidden');
+function closeModal(modalId) {
+    console.log(`🔴 Cerrando modal: ${modalId}`);
+
+    // Si es el modal de edición, limpiar los campos para evitar que persistan los valores
+    if (modalId === 'editModal') {
+        $('#concepto_nivel_1_results').val('').trigger('change');
+        $('#concepto_nivel_2_results').empty().append('<option value="">Seleccionar</option>').trigger('change');
+        $('#concepto_nivel_3_results').empty().append('<option value="">Seleccionar</option>').trigger('change');
+
+        document.getElementById("movimientoNotas").value = "";
+        document.getElementById("movimientoTipo").value = "";
+        document.getElementById("modalTitle").innerText = "Editar Movimiento";
+
+        // Limpiar proveedor
+        $('#movimientoProveedor').val('').trigger('change');
+        console.log("✅ Proveedor limpiado");
     }
+
+    document.getElementById(modalId).classList.add('hidden');
+}
+
 </script>
 
+<script>
+  // Contador para verificar si ya se mostró la alerta durante esta carga
+  let dailyReportAlertCount = 0;
 
+  document.getElementById('dailyReportBtn').addEventListener('click', function(event) {
+    if (dailyReportAlertCount === 0) {
+      event.preventDefault(); // Evita la redirección inmediata
+      Swal.fire({
+        title: 'Información',
+        text: 'Para realizar el reporte diario, debe tener filtrado con las fechas actuales en fecha inicio y fecha fin',
+        icon: 'info',
+        confirmButtonText: 'OK'
+      }).then(function(result) {
+        if (result.isConfirmed) {
+          // Incrementa el contador para que no se muestre la alerta nuevamente en esta carga
+          dailyReportAlertCount++;
+          // Redirige al usuario después de cerrar la alerta
+        }
+      });
+    } else {
+      // Si la alerta ya se mostró, redirige inmediatamente
+      window.location.href = "{% url 'reporte_diario' %}?saldo_inicial={{ saldo_inicial|floatformat:2 }}";
+    }
+  });
+</script>
 
 
 {% endblock %}

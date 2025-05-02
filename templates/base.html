@@ -103,53 +103,79 @@ tailwind.config = {
       <i class="fas fa-cash-register mr-2"></i>
       Caja Chica
     </a>
+        <a href="{% url 'ver_calendar' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+      <i class="fas fa-calendar-alt mr-2"></i>
+      Calendario
+  </a>
+        <a href="{% url 'prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+        <i class="fas fa-hand-holding-usd mr-2"></i>
+        Crear Prestamo
+      </a>
+
+<a href="{% url 'prestamos_irregular' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+    <i class="fas fa-hand-holding-usd mr-2"></i>
+    Crear Prestamo Irregular
+</a>
+
+
+
+
+    <!-- Ver Préstamos -->
+    <a href="{% url 'ver_prestamos_irregulares' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+      <i class="fas fa-list mr-2"></i>
+      Ver Préstamos Irregulares
+    </a>
+        <!-- Ver Préstamos -->
+    <a href="{% url 'ver_prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+      <i class="fas fa-list mr-2"></i>
+      Ver Préstamos
+    </a>
+      <!-- Préstamos (solo si el usuario es staff) -->
+    <!--{% if user.is_staff %}-->
+
+
+    <!--{% endif %}-->
+      <!-- Reportes -->
+    <a href="{% url 'reportes' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+      <i class="fas fa-chart-bar mr-2"></i>
+      Reportes
+    </a>
+        <!-- Conceptos -->
+    <a href="{% url 'conceptos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+      <i class="fas fa-list-alt mr-2"></i>
+      Conceptos
+    </a>
 
     <!-- Proveedores -->
     <a href="{% url 'proveedores' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
       <i class="fas fa-truck mr-2"></i>
       Proveedores
     </a>
-
-    <!-- Reportes -->
-    <a href="{% url 'reportes' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-      <i class="fas fa-chart-bar mr-2"></i>
-      Reportes
-    </a>
-
-    <!-- Conceptos -->
-    <a href="{% url 'conceptos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-      <i class="fas fa-list-alt mr-2"></i>
-      Conceptos
-    </a>
-
-
-    <!-- Préstamos (solo si el usuario es staff) -->
-    {% if user.is_staff %}
-      <a href="{% url 'prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-        <i class="fas fa-hand-holding-usd mr-2"></i>
-        Crear Prestamo
-      </a>
-          <!-- Ver Personal -->
+              <!-- Ver Personal -->
     <a href="{% url 'ver_personal' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
       <i class="fas fa-users mr-2"></i>
       Ver Personal
     </a>
-        <a href="{% url 'ver_calendar' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-      <i class="fas fa-calendar-alt mr-2"></i>
-      Calendario
-  </a>
-
-    <!-- Ver Préstamos -->
-    <a href="{% url 'ver_prestamos' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
-      <i class="fas fa-list mr-2"></i>
-      Ver Préstamos
+      <a href="{% url 'cerrar_caja' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+        <i class="fas fa-cash-register mr-2"></i>
+        Cerrar Caja
+      </a>
+             <!-- Ver Personal -->
+    <a href="{% url 'ver_personal' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+      <i class="fas fa-users mr-2"></i>
+      Ver Personal
     </a>
+    {% if user.is_staff %}
 
       <a href="{% url 'cerrar_caja' %}" class="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
         <i class="fas fa-cash-register mr-2"></i>
         Cerrar Caja
       </a>
     {% endif %}
+
+
+
+
   </nav>
 {% endif %}
 

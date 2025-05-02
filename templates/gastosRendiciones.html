@@ -13,6 +13,7 @@
     <!-- Incluyendo el CSS de Select2 -->
     <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
 
 <style>
@@ -42,58 +43,123 @@
   }
 </style>
 <main class="container mx-auto py-2">
-<div class="bg-gray-100 p-4 rounded shadow-md mb-6">
-  <h3 class="text-lg font-bold mb-2">Detalles del Gasto</h3>
-<div class="bg-white p-6 rounded-lg shadow-md">
-  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-    <!-- Sección de Requerimientos -->
-    <div>
-      <p class="text-gray-700">
-        <span class="font-bold ">ID Requerimiento:</span>
-        {{ gasto.id_requerimiento }}
-      </p>
-      <p class="text-gray-700">
-        <span class="font-bold ">N° Requerimiento:</span>
-        {{ gasto.num_requerimiento }}
-      </p>
-    </div>
-    <!-- Sección de Fecha y Proveedor -->
-    <div>
-      <p class="text-gray-700">
-        <span class="font-bold ">Fecha Gasto:</span>
-        {{ gasto.fecha_gasto|date:"d/m/Y" }}
-      </p>
-      <p class="text-gray-700">
-        <span class="font-bold ">Nombre Proveedor:</span>
-        {{ gasto.nombre_proveedor }}
-      </p>
-    </div>
-    <!-- Sección de Local e Importe -->
-    <div>
-      <p class="text-gray-700">
-        <span class="font-bold ">Local:</span>
-        {{ gasto.local }}
-      </p>
-      <p class="text-gray-700">
-        <span class="font-bold ">Importe:</span>
-        S/ {{ gasto.importe }}
-      </p>
-    </div>
-    <!-- Sección de Moneda y Observación (ocupa el ancho completo en pantallas medianas y superiores) -->
-    <div class="sm:col-span-2 md:col-span-3">
-      <p class="text-gray-700">
-        <span class="font-bold ">Moneda:</span>
-        {{ gasto.moneda }}
-      </p>
-      <p class="text-gray-700">
-        <span class="font-bold ">Observación:</span>
-        {{ gasto.observacion }}
-      </p>
+  <div class="bg-gray-100 p-4 rounded shadow-md mb-6">
+    <h3 class="text-lg font-bold mb-2">Detalles del Gasto</h3>
+    <div class="bg-white p-6 rounded-lg shadow-md relative" x-data="{ editing: false }" x-ref="container">
+      <!-- Botón de edición, se muestra solo si gasto.tipo_comprobante es "Sin Requerimiento" -->
+      {% if gasto.tipo_comprobante == "Sin Requerimiento" %}
+      <button class="absolute top-2 right-2 text-gray-400 hover:text-blue-500 transition-colors"
+              @click="editing = true; $nextTick(() => { 
+                        document.getElementById('id_requerimiento').readOnly = false;
+                        document.getElementById('num_requerimiento').readOnly = false;
+                        document.getElementById('area').disabled = false;
+                      })">
+        <i class="fas fa-edit"></i>
+      </button>
+      {% endif %}
+    
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <!-- Sección de Requerimientos (editables) -->
+        <div class="space-y-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-500">ID Requerimiento</label>
+            <input type="text" 
+                   value="{{ gasto.id_requerimiento }}" 
+                   :readonly="!editing"
+                   class="w-full bg-gray-50 border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1 px-2 transition-all"
+                   id="id_requerimiento">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-500">N° Requerimiento</label>
+            <input type="text" 
+                   value="{{ gasto.num_requerimiento }}"
+                   :readonly="!editing"
+                   class="w-full bg-gray-50 border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1 px-2 transition-all"
+                   id="num_requerimiento">
+          </div>
+        </div>
+    
+        <!-- Sección de Fecha y Proveedor -->
+        <div class="space-y-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-500">Fecha Gasto</label>
+            <div class="bg-gray-50 border-b-2 border-gray-200 py-1 px-2">
+              {{ gasto.fecha_gasto|date:"d/m/Y" }}
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-500">Proveedor</label>
+            <div class="bg-gray-50 border-b-2 border-gray-200 py-1 px-2">
+              {{ gasto.nombre_proveedor }}
+            </div>
+          </div>
+        </div>
+    
+        <!-- Sección de Local e Importe -->
+        <div class="space-y-2">
+          <div>
+            <label class="block text-sm font-medium text-gray-500">Local</label>
+            <div class="bg-gray-50 border-b-2 border-gray-200 py-1 px-2">
+              {{ gasto.local }}
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-500">Importe</label>
+            <div class="bg-gray-50 border-b-2 border-gray-200 py-1 px-2">
+              S/ {{ gasto.importe }}
+            </div>
+          </div>
+        </div>
+    
+        <!-- Área (editable) -->
+        <div class="sm:col-span-2 md:col-span-3 space-y-2">
+          <label class="block text-sm font-medium text-gray-500">Área</label>
+          <select id="area" 
+                  class="w-full bg-gray-50 border-b-2 border-gray-200 focus:border-blue-500 outline-none py-1 px-2 transition-all"
+                  :disabled="!editing">
+            <option value="" selected disabled>Seleccione una opción</option>
+            <option value="Sistemas" {% if gasto.campo_area == "Sistemas" %}selected{% endif %}>Sistemas</option>
+            <option value="Academico" {% if gasto.campo_area == "Academico" %}selected{% endif %}>Académico</option>
+            <option value="Imagen" {% if gasto.campo_area == "Imagen" %}selected{% endif %}>Imagen</option>
+            <option value="Gerencia" {% if gasto.campo_area == "Gerencia" %}selected{% endif %}>Gerencia</option>
+            <option value="Administracion" {% if gasto.campo_area == "Administracion" %}selected{% endif %}>Administración</option>
+            <option value="Marketing" {% if gasto.campo_area == "Marketing" %}selected{% endif %}>Marketing</option>
+            <option value="Ventas" {% if gasto.campo_area == "Ventas" %}selected{% endif %}>Ventas</option>
+            <option value="Almacen" {% if gasto.campo_area == "Almacen" %}selected{% endif %}>Almacen</option>
+            <option value="Tesoreria" {% if gasto.campo_area == "Tesoreria" %}selected{% endif %}>Tesoreria</option>
+          </select>
+        </div>
+    
+        <!-- Observación -->
+        <div class="sm:col-span-2 md:col-span-3 space-y-2">
+          <label class="block text-sm font-medium text-gray-500">Observación</label>
+          <div class="bg-gray-50 border-b-2 border-gray-200 py-1 px-2 min-h-[2rem]">
+            {{ gasto.observacion }}
+          </div>
+        </div>
+    
+        <!-- Botón de guardar (oculto inicialmente) -->
+        <div class="sm:col-span-2 md:col-span-3 flex justify-end gap-2"
+             x-show="editing"
+             x-cloak>
+             <button id="btn-cancelar" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+             @click="editing = false; 
+                     document.getElementById('id_requerimiento').readOnly = true;
+                     document.getElementById('num_requerimiento').readOnly = true;
+                     document.getElementById('area').disabled = true;">
+       Cancelar
+     </button>
+
+<!-- Botón de guardar -->
+<button id="btn-guardar" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+        @click="guardarCambios()">
+  <i class="fas fa-save mr-2"></i>Guardar
+</button>
+        </div>
+      </div>
     </div>
   </div>
-</div>
-
-</div>
+  
   <!-- Formulario -->
     {% csrf_token %}
     <input type="hidden" name="gasto_id" value="{{ gasto.id }}" /> <!-- Campo oculto para el ID del Gasto -->
@@ -241,6 +307,96 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  function guardarCambios() {
+    const idRequerimiento = document.getElementById('id_requerimiento').value.trim();
+    const numRequerimiento = document.getElementById('num_requerimiento').value.trim();
+    const area = document.getElementById('area').value.trim();
+  
+    // Validación: que los campos requeridos estén completos
+    if (!idRequerimiento || !numRequerimiento || !area) {
+      Swal.fire({
+        title: '¡Error!',
+        text: 'Por favor, complete todos los campos requeridos.',
+        icon: 'error',
+        confirmButtonText: 'OK'
+      });
+      return;
+    }
+  
+    const data = {
+      id_requerimiento: idRequerimiento,
+      num_requerimiento: numRequerimiento,
+      area: area,
+      csrfmiddlewaretoken: '{{ csrf_token }}'
+    };
+  
+    fetch(`/gastos/actualizar/{{ gasto.id }}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log("Respuesta del servidor:", data); // para depurar
+      if (data.status === 'success') {
+        // Accedemos al contenedor Alpine usando x-ref
+        const alpineContainer = document.querySelector('[x-ref="container"]');
+        if (alpineContainer && alpineContainer.__x) {
+          alpineContainer.__x.$data.editing = false;
+        }
+
+        // Aseguramos que los campos vuelvan a solo lectura/deshabilitado
+        document.getElementById('id_requerimiento').readOnly = true;
+        document.getElementById('num_requerimiento').readOnly = true;
+        document.getElementById('area').disabled = true;
+          // Ocultar botones directamente
+        document.getElementById('btn-cancelar').style.display = 'none';
+        document.getElementById('btn-guardar').style.display = 'none';
+
+        // Mostrar notificación de éxito con SweetAlert
+        Swal.fire({
+          title: '¡Éxito!',
+          text: 'Cambios guardados exitosamente',
+          icon: 'success',
+          confirmButtonText: 'OK'
+        });
+      } else {
+        Swal.fire({
+          title: '¡Error!',
+          text: data.message || 'Error al guardar los cambios',
+          icon: 'error',
+          confirmButtonText: 'OK'
+        });
+      }
+    })
+    .catch(error => {
+      console.error("Error en la petición:", error);
+      Swal.fire({
+        title: '¡Error!',
+        text: 'Error al guardar los cambios',
+        icon: 'error',
+        confirmButtonText: 'OK'
+      });
+    });
+  }
+  </script>
+  
+
+
+
+
+
+
+
+
+
+
+
 
 <script>
     $(document).ready(function () {
